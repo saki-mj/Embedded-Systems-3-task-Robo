@@ -98,6 +98,26 @@ void OLEDDisplay::showTOF(uint16_t left, uint16_t front, uint16_t right) {
     display.display();
 }
 
+// Show color sensor readings
+void OLEDDisplay::showColor(const String& position, const String& colorName, uint16_t lux) {
+    if (!initialized) return;
+    
+    display.clearDisplay();
+    display.setCursor(0, 0);
+    display.setTextSize(1);
+    display.setTextColor(SSD1306_WHITE);
+    
+    display.print("=== ");
+    display.print(position);
+    display.println(" ===");
+    display.print("Color: ");
+    display.println(colorName);
+    display.print("Lux: ");
+    display.println(lux);
+    
+    display.display();
+}
+
 // Show IR sensor status
 void OLEDDisplay::showIRStatus(bool calibrated, int activeCount) {
     if (!initialized) return;

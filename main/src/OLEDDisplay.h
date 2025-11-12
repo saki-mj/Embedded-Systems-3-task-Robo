@@ -47,6 +47,9 @@ class OLEDDisplay {
     // Show TOF sensor readings
     void showTOF(uint16_t left, uint16_t front, uint16_t right);
     
+    // Show color sensor readings
+    void showColor(const String& position, const String& colorName, uint16_t lux);
+    
     // Show IR sensor status
     void showIRStatus(bool calibrated, int activeCount);
     

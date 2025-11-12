@@ -7,6 +7,8 @@
 #include "IRReading.h"
 #include "LineFollow.h"
 #include "TOFSensors.h"
+#include "ColorSensors.h"
+#include "PushButton.h"
 #include "OLEDDisplay.h"
 #include "StateMachine.h"
 #include "tasks/Task1_Plantation.h"
@@ -117,6 +119,32 @@ void processSerialCommand(String command) {
     tofSensors.setObstacleThreshold(threshold);
     oledDisplay.show("TOF Threshold", String(threshold) + " mm");
   }
+  // Color Sensors
+  else if (command == "COLORREAD") {
+    printColorValues();
+  }
+  else if (command == "COLORBOTTOM") {
+    colorSensors.readBottomSensor();
+    ColorData data = colorSensors.getBottomColorData();
+    Serial.print("Bottom: R="); Serial.print(data.r);
+    Serial.print(" G="); Serial.print(data.g);
+    Serial.print(" B="); Serial.print(data.b);
+    Serial.print(" Color="); Serial.println(colorSensors.getColorName(colorSensors.getBottomColor()));
+    oledDisplay.show("Bottom Color", colorSensors.getColorName(colorSensors.getBottomColor()));
+  }
+  else if (command == "COLORTOP") {
+    colorSensors.readTopSensor();
+    ColorData data = colorSensors.getTopColorData();
+    Serial.print("Top: R="); Serial.print(data.r);
+    Serial.print(" G="); Serial.print(data.g);
+    Serial.print(" B="); Serial.print(data.b);
+    Serial.print(" Color="); Serial.println(colorSensors.getColorName(colorSensors.getTopColor()));
+    oledDisplay.show("Top Color", colorSensors.getColorName(colorSensors.getTopColor()));
+  }
+  // Push Button
+  else if (command == "BUTTONREAD") {
+    pushButton.printState();
+  }
   // OLED Display
   else if (command == "OLEDCLEAR") {
     oledDisplay.clear();
@@ -224,6 +252,14 @@ void printSerialCommands() {
   Serial.println("TOF Sensors:");
   Serial.println("  TOFREAD - Read and display TOF distances");
   Serial.println("  TOFTHRESHOLD <mm> - Set obstacle threshold");
+  Serial.println();
+  Serial.println("Color Sensors:");
+  Serial.println("  COLORREAD - Read both color sensors");
+  Serial.println("  COLORBOTTOM - Read bottom color sensor (Ch 4)");
+  Serial.println("  COLORTOP - Read top color sensor (Ch 2)");
+  Serial.println();
+  Serial.println("Push Button:");
+  Serial.println("  BUTTONREAD - Read current button state");
   Serial.println();
   Serial.println("OLED Display:");
   Serial.println("  OLEDCLEAR - Clear OLED display");

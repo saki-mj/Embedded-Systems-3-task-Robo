@@ -8,7 +8,7 @@ This project implements a modular, task-based robot control system with:
 - **5 Independent Tasks**: Plantation, Wall Following, Ramp Navigation, Barcode Reading, and Ball Unloading
 - **State Machine Architecture**: Clean separation of tasks with sub-state management
 - **Manual & Automatic Modes**: Full control or autonomous sequential execution
-- **Multi-Sensor Integration**: TOF sensors, IR sensor array, and OLED display
+- **Multi-Sensor Integration**: TOF sensors, Color sensors, IR sensor array, OLED display, and Push button
 - **Comprehensive Serial Interface**: Complete command-line control system
 
 ## Project Structure
@@ -22,6 +22,8 @@ main/
     ├── IRReading.h/cpp       # CD74HC4067 MUX IR sensor array
     ├── LineFollow.h/cpp      # PD controller for line following
     ├── TOFSensors.h/cpp      # VL53L0X TOF sensor manager
+    ├── ColorSensors.h/cpp    # TCS34725 RGB color sensors (2x)
+    ├── PushButton.h/cpp      # 5-button analog switch
     ├── I2CMux.h/cpp          # PCA9548A I2C multiplexer
     ├── OLEDDisplay.h/cpp     # SSD1306 OLED display wrapper
     ├── SerialCommands.h/cpp  # Command processing system
@@ -67,6 +69,20 @@ main/
 - Obstacle detection with configurable threshold
 - Functions: `readAll()`, `getLeftDistance()`, `isObstacleFront()`
 
+#### ColorSensors (ColorSensors.h / ColorSensors.cpp)
+**TCS34725 RGB Color Sensor Manager**
+- 2 color sensors (Bottom on Ch 4, Top on Ch 2) via I2C multiplexer
+- RGB color detection with classification (RED, GREEN, BLUE, YELLOW, WHITE, BLACK)
+- Lux and color temperature measurement
+- Functions: `readAll()`, `getBottomColor()`, `getTopColor()`, `getColorName()`
+
+#### PushButton (PushButton.h / PushButton.cpp)
+**5-Button Analog Switch**
+- Five buttons (UP, LEFT, MIDDLE, RIGHT, DOWN) on single GPIO 19
+- Voltage divider detection with debouncing
+- Edge detection for button press events
+- Functions: `update()`, `isPressed()`, `wasPressed()`, `getCurrentButton()`
+
 #### I2CMux (I2CMux.h / I2CMux.cpp)
 **PCA9548A I2C Multiplexer Controller**
 - 8-channel I2C multiplexer at address 0x70
@@ -76,8 +92,8 @@ main/
 #### OLEDDisplay (OLEDDisplay.h / OLEDDisplay.cpp)
 **SSD1306 OLED Display Wrapper**
 - 128x64 display at I2C address 0x3C
-- Multiple display modes: status, TOF readings, line following, IR status
-- Functions: `show()`, `showStatus()`, `showTOF()`, `showLineFollowing()`
+- Multiple display modes: status, TOF readings, color sensors, line following, IR status
+- Functions: `show()`, `showStatus()`, `showTOF()`, `showColor()`, `showLineFollowing()`
 
 #### SerialCommands (SerialCommands.h / SerialCommands.cpp)
 **Centralized Command Processing**
@@ -154,6 +170,14 @@ Sub-states: INIT, NAVIGATE_TO_ZONE, ALIGN, UNLOADING, VERIFY, COMPLETED
 - `TOFREAD` - Read and display TOF distances
 - `TOFTHRESHOLD <mm>` - Set obstacle threshold (e.g., `TOFTHRESHOLD 200`)
 
+### Color Sensors
+- `COLORREAD` - Read both color sensors (bottom and top)
+- `COLORBOTTOM` - Read bottom color sensor (Channel 4)
+- `COLORTOP` - Read top color sensor (Channel 2)
+
+### Push Button
+- `BUTTONREAD` - Read current button state
+
 ### OLED Display
 - `OLEDCLEAR` - Clear OLED display
 
@@ -183,6 +207,17 @@ Sub-states: INIT, NAVIGATE_TO_ZONE, ALIGN, UNLOADING, VERIFY, COMPLETED
   - Left TOF: Mux Channel 0
   - Front TOF: Mux Channel 1
   - Right TOF: Mux Channel 3
+- **TCS34725 Color Sensors** (2x): Address 0x29 each
+  - Bottom Color Sensor: Mux Channel 4
+  - Top Color Sensor: Mux Channel 2
+
+### Push Button Switch
+- **5-Button Analog Switch**: GPIO 19 (12-bit ADC)
+  - UP: 0-50 (available for custom use)
+  - LEFT: 1100-1200 (available for custom use)
+  - MIDDLE: 1750-1850 (available for custom use)
+  - RIGHT: 2600-2750 ⚡ **Cycle through tasks**
+  - DOWN: 3750-4020 🛑 **Emergency stop**
 
 ## Quick Start Guide
 
@@ -193,7 +228,8 @@ Sub-states: INIT, NAVIGATE_TO_ZONE, ALIGN, UNLOADING, VERIFY, COMPLETED
 3. Type: START
 4. Type: TASK1 (or TASK2, TASK3, etc.)
 5. Watch OLED for sub-state updates
-6. Use EMERGENCY to stop if needed
+6. Press RIGHT button to switch tasks
+7. Press DOWN button for emergency stop
 ```
 
 ### 2. Automatic Mode (Competition Run)
@@ -210,8 +246,10 @@ Sub-states: INIT, NAVIGATE_TO_ZONE, ALIGN, UNLOADING, VERIFY, COMPLETED
 1. Test motors: RF, RB, RTL, RTR, STOP
 2. Calibrate IR: IRCALIBRATE (move over black/white for 10s)
 3. Test TOF: TOFREAD
-4. Test line follow: LINEFOLLOW
-5. Check status: STATUS
+4. Test colors: COLORREAD, COLORBOTTOM, COLORTOP
+5. Test button: BUTTONREAD (press buttons to see detection)
+6. Test line follow: LINEFOLLOW
+7. Check status: STATUS
 ```
 
 ## Implementing Custom Task Logic
@@ -232,6 +270,8 @@ void TaskX::execute() {
       // Your task logic here
       // Available functions:
       // - tofSensors.getLeftDistance()
+      // - colorSensors.getBottomColor()
+      // - pushButton.isPressed(BTN_UP)
       // - readIRSensor(0-7)
       // - robotForward(), turnLeft(), etc.
       // - executeLineFollow()
@@ -249,12 +289,14 @@ void TaskX::execute() {
 
 ✅ **Modular Architecture** - Each task is independent and testable  
 ✅ **State Machine** - Clean state management with auto-progression  
-✅ **Multi-Sensor Integration** - TOF, IR, and OLED working together  
+✅ **Multi-Sensor Integration** - TOF, Color, IR, OLED, and Push button working together  
 ✅ **Flexible Control** - Manual testing or automatic competition runs  
 ✅ **Real-time Feedback** - OLED shows current task and sub-state  
-✅ **Safety Features** - Emergency stop with resume capability  
+✅ **Safety Features** - Emergency stop with resume capability + physical button  
 ✅ **Comprehensive Commands** - Complete serial interface  
 ✅ **Reusable Libraries** - Portable sensor and motor code  
+✅ **Color Detection** - RGB sensors for object identification  
+✅ **User Input** - 5-button switch (RIGHT=task switch, DOWN=emergency)  
 
 ## Documentation
 
