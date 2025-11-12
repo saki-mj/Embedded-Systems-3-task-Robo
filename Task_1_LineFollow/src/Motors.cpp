@@ -5,6 +5,7 @@
 #include "Motors.h"
 #include "IRReading.h"
 #include "LineFollow.h"
+#include "TOFSensors.h"
 
 // -------------------------------------------------------------------------
 // Global Variables
@@ -242,6 +243,15 @@ void processCommand(String command) {
     float value = command.substring(5).toFloat();
     setKd(value);
   }
+  // TOF Sensors
+  else if (command == "TOFREAD") {
+    readTOFSensors();
+    printTOFValues();
+  }
+  else if (command.startsWith("TOFTHRESHOLD ")) {
+    int threshold = command.substring(13).toInt();
+    tofSensors.setObstacleThreshold(threshold);
+  }
   else if (command == "HELP" || command == "?") {
     printCommands();
   }
@@ -279,6 +289,10 @@ void printCommands() {
   Serial.println("  INVERTLINE - Toggle line color (white/black)");
   Serial.println("  SETP <value> - Set proportional gain (e.g., SETP 15.0)");
   Serial.println("  SETD <value> - Set derivative gain (e.g., SETD 5.0)");
+  Serial.println();
+  Serial.println("TOF Distance Sensors:");
+  Serial.println("  TOFREAD - Read and display TOF sensor distances");
+  Serial.println("  TOFTHRESHOLD <mm> - Set obstacle threshold (e.g., TOFTHRESHOLD 200)");
   Serial.println();
   Serial.println("Other:");
   Serial.println("  HELP or ? - Show this help menu");

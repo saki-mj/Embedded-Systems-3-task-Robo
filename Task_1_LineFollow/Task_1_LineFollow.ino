@@ -1,10 +1,11 @@
 // -------------------------------------------------------------------------
-// Motor Control with IR Sensors - Using Motors, IRReading & LineFollow Libraries
+// Motor Control with IR Sensors and TOF Sensors - Complete Robot Control
 // -------------------------------------------------------------------------
 
 #include "src/Motors.h"
 #include "src/IRReading.h"
 #include "src/LineFollow.h"
+#include "src/TOFSensors.h"
 
 // -------------------------------------------------------------------------
 // Setup and Loop
@@ -13,11 +14,16 @@
 void setup() {
   Serial.begin(115200);
   
+  Serial.println("\n=== Robot Initialization ===");
+  
   // Initialize motors
   initMotors();
   
   // Initialize IR sensors
   initIRSensors();
+  
+  // Initialize TOF sensors
+  initTOFSensors();
   
   // Initialize line following
   initLineFollow();
@@ -27,6 +33,8 @@ void setup() {
   
   // Set default speed to level 5 (mid-range)
   setSpeedLevel(5);
+  
+  Serial.println("\n=== Robot Ready ===\n");
 }
 
 void loop() {
