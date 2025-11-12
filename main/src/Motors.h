@@ -137,19 +137,4 @@ int getCurrentSpeed();
  */
 int mapSpeedLevelToPWM(int level);
 
-// -------------------------------------------------------------------------
-// Serial Command Functions
-// -------------------------------------------------------------------------
-
-/**
- * @brief Process serial command string
- * @param command Command string from Serial input
- */
-void processCommand(String command);
-
-/**
- * @brief Print available serial commands
- */
-void printCommands();
-
 #endif // MOTORS_H
