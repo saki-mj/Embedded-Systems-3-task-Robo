@@ -89,20 +89,20 @@ void loop() {
   stateMachine.update();
   
   // Execute current task based on state
-  switch(stateMachine.getCurrentState()) {
-    case TASK1_PLANTATION:
+  switch(stateMachine.getState()) {
+    case STATE_TASK1_PLANTATION:
       task1Plantation.execute();
       break;
-    case TASK2_WALL_FOLLOW:
+    case STATE_TASK2_WALL_FOLLOW:
       task2WallFollow.execute();
       break;
-    case TASK3_RAMP:
+    case STATE_TASK3_RAMP:
       task3Ramp.execute();
       break;
-    case TASK4_BARCODE:
+    case STATE_TASK4_BARCODE:
       task4Barcode.execute();
       break;
-    case TASK5_UNLOADING:
+    case STATE_TASK5_UNLOADING:
       task5Unloading.execute();
       break;
     default:
@@ -130,6 +130,11 @@ void loop() {
   else if (isIRReadingBinaryActive()) {
     printIRBinary();
   }
+  // If TOF continuous reading is active, continuously print TOF values
+  else if (tofSensors.isContinuousReadingActive()) {
+    readTOFSensors();
+    printTOFValues();
+  }
 }
 
 // -------------------------------------------------------------------------
@@ -152,11 +157,11 @@ void handlePushButtonControls() {
   
   // RIGHT button - Change Tasks (cycle through tasks)
   if (pushButton.wasPressed(BTN_RIGHT)) {
-    RobotState currentState = stateMachine.getCurrentState();
+    RobotState currentState = stateMachine.getState();
     RobotState nextState;
     
     // Only allow task switching if not in emergency or standby
-    if (currentState == EMERGENCY_STOP || currentState == STANDBY) {
+    if (currentState == STATE_EMERGENCY_STOP || currentState == STATE_STANDBY) {
       Serial.println("Cannot switch tasks - Resume or complete initialization first");
       oledDisplay.show("Cannot Switch", "Resume First");
       delay(1000);
@@ -172,44 +177,44 @@ void handlePushButtonControls() {
     
     // Cycle through tasks
     switch(currentState) {
-      case IDLE:
-      case TASK1_PLANTATION:
-        nextState = TASK2_WALL_FOLLOW;
+      case STATE_IDLE:
+      case STATE_TASK1_PLANTATION:
+        nextState = STATE_TASK2_WALL_FOLLOW;
         task2WallFollow.start();
         Serial.println("*** Switching to Task 2: Wall Following ***");
         oledDisplay.show("Switch Task", "Task 2", "Wall Follow");
         break;
         
-      case TASK2_WALL_FOLLOW:
-        nextState = TASK3_RAMP;
+      case STATE_TASK2_WALL_FOLLOW:
+        nextState = STATE_TASK3_RAMP;
         task3Ramp.start();
         Serial.println("*** Switching to Task 3: Ramp ***");
         oledDisplay.show("Switch Task", "Task 3", "Ramp");
         break;
         
-      case TASK3_RAMP:
-        nextState = TASK4_BARCODE;
+      case STATE_TASK3_RAMP:
+        nextState = STATE_TASK4_BARCODE;
         task4Barcode.start();
         Serial.println("*** Switching to Task 4: Barcode ***");
         oledDisplay.show("Switch Task", "Task 4", "Barcode");
         break;
         
-      case TASK4_BARCODE:
-        nextState = TASK5_UNLOADING;
+      case STATE_TASK4_BARCODE:
+        nextState = STATE_TASK5_UNLOADING;
         task5Unloading.start();
         Serial.println("*** Switching to Task 5: Unloading ***");
         oledDisplay.show("Switch Task", "Task 5", "Unloading");
         break;
         
-      case TASK5_UNLOADING:
-        nextState = TASK1_PLANTATION;
+      case STATE_TASK5_UNLOADING:
+        nextState = STATE_TASK1_PLANTATION;
         task1Plantation.start();
         Serial.println("*** Switching to Task 1: Plantation ***");
         oledDisplay.show("Switch Task", "Task 1", "Plantation");
         break;
         
       default:
-        nextState = TASK1_PLANTATION;
+        nextState = STATE_TASK1_PLANTATION;
         task1Plantation.start();
         Serial.println("*** Starting Task 1: Plantation ***");
         oledDisplay.show("Switch Task", "Task 1", "Plantation");

@@ -45,6 +45,7 @@ enum DetectedColor {
 
 class ColorSensors {
   private:
+    I2CMux* mux;
     Adafruit_TCS34725* bottomSensor;
     Adafruit_TCS34725* topSensor;
     

@@ -29,9 +29,9 @@ const int maxSpeed = 1023; // 10-bit resolution (0 to 1023)
 const int freq = 30000;    // PWM frequency in Hz (30 kHz)
 
 // --- Speed Settings ---
-const int minSpeedPWM = 50;   // Minimum PWM value (motors can actually run)
+const int minSpeedPWM = 25;    // Minimum PWM value (speed level 1)
 const int maxSpeedPWM = 1023;  // Maximum PWM value (10-bit)
-const int speedLevels = 3;     // Number of speed levels (1-3)
+const int speedLevels = 12;    // Number of speed levels (1-12)
 
 // -------------------------------------------------------------------------
 // Global Variables

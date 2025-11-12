@@ -106,13 +106,12 @@ void processSerialCommand(String command) {
   }
   // TOF Sensors
   else if (command == "TOFREAD") {
-    readTOFSensors();
-    printTOFValues();
-    oledDisplay.showTOF(
-      tofSensors.getLeftDistance(),
-      tofSensors.getFrontDistance(),
-      tofSensors.getRightDistance()
-    );
+    tofSensors.toggleContinuousReading();
+    if (!tofSensors.isContinuousReadingActive()) {
+      oledDisplay.show("TOF Reading", "Stopped");
+    } else {
+      oledDisplay.show("TOF Reading", "Continuous ON");
+    }
   }
   else if (command.startsWith("TOFTHRESHOLD ")) {
     int threshold = command.substring(13).toInt();
@@ -151,7 +150,7 @@ void processSerialCommand(String command) {
   }
   // State Machine Commands
   else if (command == "START") {
-    stateMachine.setState(IDLE);
+    stateMachine.setState(STATE_IDLE);
     oledDisplay.show("State", "IDLE", "Ready");
   }
   else if (command == "AUTO") {
@@ -163,27 +162,27 @@ void processSerialCommand(String command) {
     oledDisplay.show("Mode", "Manual");
   }
   else if (command == "TASK1") {
-    stateMachine.setState(TASK1_PLANTATION);
+    stateMachine.setState(STATE_TASK1_PLANTATION);
     task1Plantation.start();
     oledDisplay.show("Starting", "Task 1", "Plantation");
   }
   else if (command == "TASK2") {
-    stateMachine.setState(TASK2_WALL_FOLLOW);
+    stateMachine.setState(STATE_TASK2_WALL_FOLLOW);
     task2WallFollow.start();
     oledDisplay.show("Starting", "Task 2", "Wall Follow");
   }
   else if (command == "TASK3") {
-    stateMachine.setState(TASK3_RAMP);
+    stateMachine.setState(STATE_TASK3_RAMP);
     task3Ramp.start();
     oledDisplay.show("Starting", "Task 3", "Ramp");
   }
   else if (command == "TASK4") {
-    stateMachine.setState(TASK4_BARCODE);
+    stateMachine.setState(STATE_TASK4_BARCODE);
     task4Barcode.start();
     oledDisplay.show("Starting", "Task 4", "Barcode");
   }
   else if (command == "TASK5") {
-    stateMachine.setState(TASK5_UNLOADING);
+    stateMachine.setState(STATE_TASK5_UNLOADING);
     task5Unloading.start();
     oledDisplay.show("Starting", "Task 5", "Unloading");
   }
@@ -197,17 +196,17 @@ void processSerialCommand(String command) {
     oledDisplay.show("EMERGENCY", "STOP", "All Stopped");
   }
   else if (command == "RESUME") {
-    if (stateMachine.getCurrentState() == EMERGENCY_STOP) {
-      stateMachine.setState(IDLE);
+    if (stateMachine.getState() == STATE_EMERGENCY_STOP) {
+      stateMachine.setState(STATE_IDLE);
       oledDisplay.show("Resumed", "to IDLE");
     }
   }
   else if (command == "STATUS") {
     Serial.print("Current State: ");
-    Serial.println(stateMachine.getStateName());
+    Serial.println(stateMachine.getStateName(stateMachine.getState()));
     Serial.print("Current Mode: ");
     Serial.println(stateMachine.getMode() == MODE_MANUAL ? "Manual" : "Automatic");
-    oledDisplay.show("State", stateMachine.getStateName(), 
+    oledDisplay.show("State", stateMachine.getStateName(stateMachine.getState()), 
                     stateMachine.getMode() == MODE_MANUAL ? "Manual" : "Auto");
   }
   else if (command == "HELP" || command == "?") {
@@ -223,7 +222,7 @@ void printSerialCommands() {
   Serial.println("Serial Commands:");
   Serial.println("========================================");
   Serial.println("Speed Control:");
-  Serial.println("  SPEED1 to SPEED10");
+  Serial.println("  SPEED1 to SPEED12");
   Serial.println();
   Serial.println("Individual Motor Control:");
   Serial.println("  LMF - Left Motor Forward");

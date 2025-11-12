@@ -7,6 +7,7 @@
 ColorSensors colorSensors;
 
 ColorSensors::ColorSensors() {
+  mux = new I2CMux();
   bottomSensor = nullptr;
   topSensor = nullptr;
   bottomInitialized = false;
@@ -20,13 +21,17 @@ ColorSensors::ColorSensors() {
 ColorSensors::~ColorSensors() {
   if (bottomSensor) delete bottomSensor;
   if (topSensor) delete topSensor;
+  if (mux) delete mux;
 }
 
 bool ColorSensors::begin() {
   Serial.println("Initializing Color Sensors...");
   
+  // Initialize I2C Multiplexer
+  mux->begin();
+  
   // Initialize bottom sensor (Channel 4)
-  i2cMux.selectChannel(BOTTOM_COLOR_CHANNEL);
+  mux->selectChannel(BOTTOM_COLOR_CHANNEL);
   delay(10);
   
   bottomSensor = new Adafruit_TCS34725(
@@ -45,7 +50,7 @@ bool ColorSensors::begin() {
   delay(50);
   
   // Initialize top sensor (Channel 2)
-  i2cMux.selectChannel(TOP_COLOR_CHANNEL);
+  mux->selectChannel(TOP_COLOR_CHANNEL);
   delay(10);
   
   topSensor = new Adafruit_TCS34725(
@@ -61,7 +66,7 @@ bool ColorSensors::begin() {
     topInitialized = false;
   }
   
-  i2cMux.disableAll();
+  mux->disableAll();
   
   if (bottomInitialized || topInitialized) {
     Serial.println("Color Sensors initialized!");
@@ -75,28 +80,28 @@ bool ColorSensors::begin() {
 bool ColorSensors::readBottomSensor() {
   if (!bottomInitialized) return false;
   
-  i2cMux.selectChannel(BOTTOM_COLOR_CHANNEL);
+  mux->selectChannel(BOTTOM_COLOR_CHANNEL);
   delay(5);
   
   bottomSensor->getRawData(&bottomData.r, &bottomData.g, &bottomData.b, &bottomData.c);
   bottomData.colorTemp = bottomSensor->calculateColorTemperature(bottomData.r, bottomData.g, bottomData.b);
   bottomData.lux = bottomSensor->calculateLux(bottomData.r, bottomData.g, bottomData.b);
   
-  i2cMux.disableAll();
+  mux->disableAll();
   return true;
 }
 
 bool ColorSensors::readTopSensor() {
   if (!topInitialized) return false;
   
-  i2cMux.selectChannel(TOP_COLOR_CHANNEL);
+  mux->selectChannel(TOP_COLOR_CHANNEL);
   delay(5);
   
   topSensor->getRawData(&topData.r, &topData.g, &topData.b, &topData.c);
   topData.colorTemp = topSensor->calculateColorTemperature(topData.r, topData.g, topData.b);
   topData.lux = topSensor->calculateLux(topData.r, topData.g, topData.b);
   
-  i2cMux.disableAll();
+  mux->disableAll();
   return true;
 }
 

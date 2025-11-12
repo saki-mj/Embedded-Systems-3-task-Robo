@@ -19,6 +19,7 @@ TOFSensors::TOFSensors() {
   rightValid = false;
   
   obstacleThreshold = TOF_OBSTACLE_THRESHOLD;
+  continuousReadingActive = false;
 }
 
 // Initialize all TOF sensors
@@ -178,6 +179,19 @@ bool TOFSensors::isFrontValid() {
 
 bool TOFSensors::isRightValid() {
   return rightValid;
+}
+
+void TOFSensors::toggleContinuousReading() {
+  continuousReadingActive = !continuousReadingActive;
+  if (continuousReadingActive) {
+    Serial.println("TOF Continuous Reading: ON");
+  } else {
+    Serial.println("TOF Continuous Reading: OFF");
+  }
+}
+
+bool TOFSensors::isContinuousReadingActive() {
+  return continuousReadingActive;
 }
 
 // Global functions

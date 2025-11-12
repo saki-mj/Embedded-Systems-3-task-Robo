@@ -9,7 +9,7 @@
 // -------------------------------------------------------------------------
 // Global Variables
 // -------------------------------------------------------------------------
-int currentSpeed = 50; // Default to speed level 1 (50 PWM)
+int currentSpeed = 25; // Default to speed level 1 (25 PWM)
 
 // -------------------------------------------------------------------------
 // Motor Initialization
@@ -150,7 +150,7 @@ void stopAllMotors() {
 // -------------------------------------------------------------------------
 
 void setSpeedLevel(int level) {
-  // Clamp level to valid range (1-10)
+  // Clamp level to valid range (1-12)
   if (level < 1) level = 1;
   if (level > speedLevels) level = speedLevels;
   
@@ -167,15 +167,28 @@ int getCurrentSpeed() {
 }
 
 int mapSpeedLevelToPWM(int level) {
-  // Map level (1-3) to PWM values (50, 100, 150)
-  // Level 1 = 50 PWM
-  // Level 2 = 100 PWM
-  // Level 3 = 150 PWM
+  // Speed mapping as requested:
+  // Level 1 = 25 PWM
+  // Level 2 = 35 PWM
+  // Level 3 = 50 PWM
+  // Level 4 = 100 PWM
+  // Level 5 = 150 PWM
+  // Level 6 = 200 PWM
+  // Levels 7-12 evenly distributed from 200 to 1023
   switch(level) {
-    case 1: return 50;
-    case 2: return 100;
-    case 3: return 150;
-    default: return 50;  // Default to level 1
+    case 1: return 40;
+    case 2: return 45;
+    case 3: return 50;
+    case 4: return 75;
+    case 5: return 100;
+    case 6: return 200;
+    case 7: return 337;   // 200 + (1023-200)/6 * 1
+    case 8: return 474;   // 200 + (1023-200)/6 * 2
+    case 9: return 611;   // 200 + (1023-200)/6 * 3
+    case 10: return 748;  // 200 + (1023-200)/6 * 4
+    case 11: return 885;  // 200 + (1023-200)/6 * 5
+    case 12: return 1023; // Maximum speed
+    default: return 25;   // Default to level 1
   }
 }
 

@@ -30,6 +30,8 @@ class TOFSensors {
     bool rightValid;
     
     uint16_t obstacleThreshold;
+    
+    bool continuousReadingActive;
 
   public:
     // Constructor
@@ -61,6 +63,10 @@ class TOFSensors {
     bool isLeftValid();
     bool isFrontValid();
     bool isRightValid();
+    
+    // Toggle continuous reading mode
+    void toggleContinuousReading();
+    bool isContinuousReadingActive();
 };
 
 // Global TOF sensor object
