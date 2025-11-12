@@ -32,10 +32,15 @@ void setup() {
   printCommands();
   
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
   // Set default speed to level 5 (mid-range)
   setSpeedLevel(5);
   
   Serial.println("\n=== Robot Ready ===\n");
+=======
+  // Set default speed to level 1 (50 PWM)
+  setSpeedLevel(1);
+>>>>>>> Stashed changes
 =======
   // Set default speed to level 1 (50 PWM)
   setSpeedLevel(1);
