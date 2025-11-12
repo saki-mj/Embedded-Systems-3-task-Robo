@@ -166,15 +166,28 @@ int getCurrentSpeed() {
   return currentSpeed;
 }
 
+void setCurrentSpeed(int speed) {
+  currentSpeed = constrain(speed, 0, maxSpeedPWM);
+}
+
+void setLeftMotorSpeed(int speed) {
+  // Left motor speed control (Motor A)
+  speed = constrain(speed, 0, maxSpeedPWM);
+  // Keep current direction, just change speed
+  // This will be used in conjunction with robotForward() or other direction commands
+  analogWrite(PWMA, speed);
+}
+
+void setRightMotorSpeed(int speed) {
+  // Right motor speed control (Motor B)
+  speed = constrain(speed, 0, maxSpeedPWM);
+  // Keep current direction, just change speed
+  // This will be used in conjunction with robotForward() or other direction commands
+  analogWrite(PWMB, speed);
+}
+
 int mapSpeedLevelToPWM(int level) {
-  // Speed mapping as requested:
-  // Level 1 = 25 PWM
-  // Level 2 = 35 PWM
-  // Level 3 = 50 PWM
-  // Level 4 = 100 PWM
-  // Level 5 = 150 PWM
-  // Level 6 = 200 PWM
-  // Levels 7-12 evenly distributed from 200 to 1023
+
   switch(level) {
     case 1: return 40;
     case 2: return 45;
