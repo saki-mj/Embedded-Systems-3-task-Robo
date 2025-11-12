@@ -1,10 +1,11 @@
 // -------------------------------------------------------------------------
-// Motor Control with IR Sensors - Using Motors, IRReading & LineFollow Libraries
+// Motor Control with IR Sensors and TOF Sensors - Complete Robot Control
 // -------------------------------------------------------------------------
 
 #include "src/Motors.h"
 #include "src/IRReading.h"
 #include "src/LineFollow.h"
+#include "src/TOFSensors.h"
 
 // -------------------------------------------------------------------------
 // Setup and Loop
@@ -13,11 +14,16 @@
 void setup() {
   Serial.begin(115200);
   
+  Serial.println("\n=== Robot Initialization ===");
+  
   // Initialize motors
   initMotors();
   
   // Initialize IR sensors
   initIRSensors();
+  
+  // Initialize TOF sensors
+  initTOFSensors();
   
   // Initialize line following
   initLineFollow();
@@ -25,8 +31,20 @@ void setup() {
   // Print available commands
   printCommands();
   
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
   // Set default speed to level 5 (mid-range)
   setSpeedLevel(5);
+  
+  Serial.println("\n=== Robot Ready ===\n");
+=======
+  // Set default speed to level 1 (50 PWM)
+  setSpeedLevel(1);
+>>>>>>> Stashed changes
+=======
+  // Set default speed to level 1 (50 PWM)
+  setSpeedLevel(1);
+>>>>>>> Stashed changes
 }
 
 void loop() {
@@ -40,15 +58,15 @@ void loop() {
   if (isLineFollowActive()) {
     executeLineFollow();
   }
-  // If IR reading mode is active (and not line following), continuously print IR values
+  // If raw IR reading mode is active, continuously print raw IR values
   else if (isIRReadingActive()) {
-    // If calibrated, show binary values; otherwise show raw values
-    extern bool irCalibrated;
-    if (irCalibrated) {
-      printIRBinary();  // Show 0/1 for line following
-    } else {
-      printIRValues();  // Show raw values
-    }
+    printIRValues();  // Show raw analog values
+    // Optional: Add a small delay to control data rate
+    // delay(100); // Uncomment for slower updates (100ms between scans)
+  }
+  // If binary IR reading mode is active, continuously print binary values
+  else if (isIRReadingBinaryActive()) {
+    printIRBinary();  // Show 0/1 for line following
     // Optional: Add a small delay to control data rate
     // delay(100); // Uncomment for slower updates (100ms between scans)
   }

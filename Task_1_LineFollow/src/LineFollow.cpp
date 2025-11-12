@@ -22,7 +22,7 @@ float lastError = 0;          // Previous error for derivative calculation
 // Center is between sensors 7 and 8 (position 0)
 const int sensorWeights[16] = {
   -7, -6, -5, -4, -3, -2, -1, 0,  // Sensors 0-7
-   1,  2,  3,  4,  5,  6,  7, 8   // Sensors 8-15
+   0, 1,  2,  3,  4,  5,  6,  7   // Sensors 8-15
 };
 
 // -------------------------------------------------------------------------

@@ -84,7 +84,8 @@ Key Functions:
 
 **IR Sensors:**
 - `IRCALIBRATE` - Calibrate sensors (10s)
-- `IRREAD` - Toggle continuous reading
+- `IRREAD` - Toggle continuous raw IR reading
+- `IRREADB` - Toggle continuous binary IR reading
 
 **Line Following:**
 - `LINEFOLLOW` - Toggle line following mode

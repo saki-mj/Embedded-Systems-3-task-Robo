@@ -32,7 +32,8 @@ const int MUX_SETTLE_TIME = 5;  // Microseconds for MUX to settle
 extern int irValues[NUM_IR_SENSORS];       // Array to store IR sensor readings
 extern int irThresholds[NUM_IR_SENSORS];   // Array to store calibrated thresholds
 extern int irBinary[NUM_IR_SENSORS];       // Array to store binary values (0 or 1)
-extern bool irReadingActive;               // Flag for continuous IR reading mode
+extern bool irReadingActive;               // Flag for continuous raw IR reading mode
+extern bool irReadingBinaryActive;         // Flag for continuous binary IR reading mode
 extern bool irCalibrated;                  // Flag indicating if calibration is complete
 
 // -------------------------------------------------------------------------
@@ -91,14 +92,25 @@ void printIRBinary();
 void printIRThresholds(int minVals[], int maxVals[]);
 
 /**
- * @brief Toggle continuous IR reading mode on/off
+ * @brief Toggle continuous raw IR reading mode on/off
  */
 void toggleIRReading();
 
 /**
- * @brief Get the current state of IR reading mode
- * @return true if IR reading is active, false otherwise
+ * @brief Toggle continuous binary IR reading mode on/off
+ */
+void toggleIRReadingBinary();
+
+/**
+ * @brief Get the current state of raw IR reading mode
+ * @return true if raw IR reading is active, false otherwise
  */
 bool isIRReadingActive();
+
+/**
+ * @brief Get the current state of binary IR reading mode
+ * @return true if binary IR reading is active, false otherwise
+ */
+bool isIRReadingBinaryActive();
 
 #endif // IR_READING_H

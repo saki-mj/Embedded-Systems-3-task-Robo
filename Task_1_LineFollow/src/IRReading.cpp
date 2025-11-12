@@ -11,7 +11,8 @@
 int irValues[NUM_IR_SENSORS] = {0};       // Array to store IR sensor readings
 int irThresholds[NUM_IR_SENSORS] = {0};   // Array to store calibrated thresholds
 int irBinary[NUM_IR_SENSORS] = {0};       // Array to store binary values (0 or 1)
-bool irReadingActive = false;             // Flag for continuous IR reading mode
+bool irReadingActive = false;             // Flag for continuous raw IR reading mode
+bool irReadingBinaryActive = false;       // Flag for continuous binary IR reading mode
 bool irCalibrated = false;                // Flag indicating if calibration is complete
 
 // Array to hold the select pin numbers
@@ -32,14 +33,14 @@ void initIRSensors() {
   pinMode(SIG_PIN, INPUT);
   
   // Load preset threshold values
-  irThresholds[0] = 2425;
-  irThresholds[1] = 2511;
-  irThresholds[2] = 2762;
-  irThresholds[3] = 2921;
-  irThresholds[4] = 3180;
-  irThresholds[5] = 3232;
-  irThresholds[6] = 3067;
-  irThresholds[7] = 3024;
+  irThresholds[0] = 2212;
+  irThresholds[1] = 2316;
+  irThresholds[2] = 2537;
+  irThresholds[3] = 2540;
+  irThresholds[4] = 2774;
+  irThresholds[5] = 2764;
+  irThresholds[6] = 2684;
+  irThresholds[7] = 2693;
   irThresholds[8] = 3067;
   irThresholds[9] = 3259;
   irThresholds[10] = 3117;
@@ -240,18 +241,33 @@ void printIRThresholds(int minVals[], int maxVals[]) {
 void toggleIRReading() {
   irReadingActive = !irReadingActive;
   
+  // Turn off binary mode if raw mode is being enabled
   if (irReadingActive) {
-    Serial.println("IR Continuous Reading: ENABLED");
-    if (irCalibrated) {
-      Serial.println("Format: Binary values (0=Black, 1=White)");
-    } else {
-      Serial.println("Format: Raw values (Calibration recommended!)");
-    }
+    irReadingBinaryActive = false;
+    Serial.println("IR Raw Reading: ENABLED");
+    Serial.println("Format: Raw analog values (0-4095)");
   } else {
-    Serial.println("IR Continuous Reading: DISABLED");
+    Serial.println("IR Raw Reading: DISABLED");
+  }
+}
+
+void toggleIRReadingBinary() {
+  irReadingBinaryActive = !irReadingBinaryActive;
+  
+  // Turn off raw mode if binary mode is being enabled
+  if (irReadingBinaryActive) {
+    irReadingActive = false;
+    Serial.println("IR Binary Reading: ENABLED");
+    Serial.println("Format: Binary values (0=Black, 1=White)");
+  } else {
+    Serial.println("IR Binary Reading: DISABLED");
   }
 }
 
 bool isIRReadingActive() {
   return irReadingActive;
+}
+
+bool isIRReadingBinaryActive() {
+  return irReadingBinaryActive;
 }

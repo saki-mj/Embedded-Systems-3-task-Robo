@@ -5,11 +5,12 @@
 #include "Motors.h"
 #include "IRReading.h"
 #include "LineFollow.h"
+#include "TOFSensors.h"
 
 // -------------------------------------------------------------------------
 // Global Variables
 // -------------------------------------------------------------------------
-int currentSpeed = 512; // Default to mid-range speed (~50%)
+int currentSpeed = 50; // Default to speed level 1 (50 PWM)
 
 // -------------------------------------------------------------------------
 // Motor Initialization
@@ -167,11 +168,16 @@ int getCurrentSpeed() {
 }
 
 int mapSpeedLevelToPWM(int level) {
-  // Map level (1-10) directly to PWM range (400-1023)
-  // Level 1 = 400 PWM (~39% duty cycle)
-  // Level 10 = 1023 PWM (100% duty cycle)
-  int speedPWM = map(level, 1, speedLevels, minSpeedPWM, maxSpeedPWM);
-  return speedPWM;
+  // Map level (1-3) to PWM values (50, 100, 150)
+  // Level 1 = 50 PWM
+  // Level 2 = 100 PWM
+  // Level 3 = 150 PWM
+  switch(level) {
+    case 1: return 50;
+    case 2: return 100;
+    case 3: return 150;
+    default: return 50;  // Default to level 1
+  }
 }
 
 // -------------------------------------------------------------------------
@@ -188,7 +194,7 @@ void processCommand(String command) {
     if (level >= 1 && level <= speedLevels) {
       setSpeedLevel(level);
     } else {
-      Serial.println("Invalid speed level. Use SPEED1 to SPEED10.");
+      Serial.println("Invalid speed level. Use SPEED1 to SPEED3.");
     }
   }
   // Individual Motor Control
@@ -224,6 +230,9 @@ void processCommand(String command) {
   else if (command == "IRREAD") {
     toggleIRReading();
   }
+  else if (command == "IRREADB") {
+    toggleIRReadingBinary();
+  }
   else if (command == "IRCALIBRATE") {
     calibrateIRSensors();
   }
@@ -242,6 +251,15 @@ void processCommand(String command) {
     float value = command.substring(5).toFloat();
     setKd(value);
   }
+  // TOF Sensors
+  else if (command == "TOFREAD") {
+    readTOFSensors();
+    printTOFValues();
+  }
+  else if (command.startsWith("TOFTHRESHOLD ")) {
+    int threshold = command.substring(13).toInt();
+    tofSensors.setObstacleThreshold(threshold);
+  }
   else if (command == "HELP" || command == "?") {
     printCommands();
   }
@@ -255,7 +273,7 @@ void printCommands() {
   Serial.println("Serial Commands:");
   Serial.println("========================================");
   Serial.println("Speed Control:");
-  Serial.println("  SPEED1 to SPEED10 (PWM 400-1023)");
+  Serial.println("  SPEED1 (50 PWM), SPEED2 (100 PWM), SPEED3 (150 PWM)");
   Serial.println();
   Serial.println("Individual Motor Control:");
   Serial.println("  LMF - Left Motor Forward");
@@ -272,13 +290,18 @@ void printCommands() {
   Serial.println();
   Serial.println("IR Sensors:");
   Serial.println("  IRCALIBRATE - Calibrate IR sensors (10s)");
-  Serial.println("  IRREAD - Toggle continuous IR sensor reading");
+  Serial.println("  IRREAD - Toggle continuous raw IR reading");
+  Serial.println("  IRREADB - Toggle continuous binary IR reading");
   Serial.println();
   Serial.println("Line Following:");
   Serial.println("  LINEFOLLOW - Toggle autonomous line following");
   Serial.println("  INVERTLINE - Toggle line color (white/black)");
   Serial.println("  SETP <value> - Set proportional gain (e.g., SETP 15.0)");
   Serial.println("  SETD <value> - Set derivative gain (e.g., SETD 5.0)");
+  Serial.println();
+  Serial.println("TOF Distance Sensors:");
+  Serial.println("  TOFREAD - Read and display TOF sensor distances");
+  Serial.println("  TOFTHRESHOLD <mm> - Set obstacle threshold (e.g., TOFTHRESHOLD 200)");
   Serial.println();
   Serial.println("Other:");
   Serial.println("  HELP or ? - Show this help menu");
