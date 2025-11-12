@@ -1,102 +1,170 @@
-# Embedded Systems - Line Following Robot
+# Embedded Systems - Multi-Task Robot Control System
 
-This is a project we are going to make for the embedded systems
+This is a complete robot control system with state machine architecture for autonomous task execution.
+
+## Project Overview
+
+This project implements a modular, task-based robot control system with:
+- **5 Independent Tasks**: Plantation, Wall Following, Ramp Navigation, Barcode Reading, and Ball Unloading
+- **State Machine Architecture**: Clean separation of tasks with sub-state management
+- **Manual & Automatic Modes**: Full control or autonomous sequential execution
+- **Multi-Sensor Integration**: TOF sensors, IR sensor array, and OLED display
+- **Comprehensive Serial Interface**: Complete command-line control system
 
 ## Project Structure
 
 ```
-Task_1_LineFollow/
-├── Task_1_LineFollow.ino     # Main Arduino sketch
-└── src/                       # Reusable library modules
-    ├── Motors.h              # Motor driver header
-    ├── Motors.cpp            # Motor driver implementation
-    ├── IRReading.h           # IR sensor array header
-    ├── IRReading.cpp         # IR sensor array implementation
-    ├── LineFollow.h          # Line following controller header
-    └── LineFollow.cpp        # Line following controller implementation
+main/
+├── main.ino                  # Main Arduino sketch
+├── STATE_MACHINE_GUIDE.md    # Complete architecture documentation
+└── src/                      # Reusable library modules
+    ├── Motors.h/cpp          # TB6612 motor driver
+    ├── IRReading.h/cpp       # CD74HC4067 MUX IR sensor array
+    ├── LineFollow.h/cpp      # PD controller for line following
+    ├── TOFSensors.h/cpp      # VL53L0X TOF sensor manager
+    ├── I2CMux.h/cpp          # PCA9548A I2C multiplexer
+    ├── OLEDDisplay.h/cpp     # SSD1306 OLED display wrapper
+    ├── SerialCommands.h/cpp  # Command processing system
+    ├── StateMachine.h/cpp    # State machine controller
+    └── tasks/                # Individual task modules
+        ├── Task1_Plantation.h/cpp
+        ├── Task2_WallFollow.h/cpp
+        ├── Task3_Ramp.h/cpp
+        ├── Task4_Barcode.h/cpp
+        └── Task5_Unloading.h/cpp
 ```
 
-## Library Modules
+## System Architecture
 
-### Motors (Motors.h / Motors.cpp)
-**TB6612 Motor Driver Library for ESP32-S3**
+### State Machine
+- **8 States**: STANDBY, IDLE, TASK1-5, EMERGENCY_STOP
+- **2 Modes**: Manual (command-driven) and Automatic (sequential)
+- **Sub-States**: Each task has its own sub-state machine for detailed control
+- **Safety**: Emergency stop capability with resume function
 
-Features:
-- Dual motor control (Motor A/B)
-- PWM speed control (10-bit resolution, 0-1023)
-- 10 speed levels for easy control
-- Individual motor and robot movement functions
-- Serial command processing
+### Core Library Modules
 
-Key Functions:
-- `initMotors()` - Initialize motor driver
-- `setMotorA(speed, forward)` / `setMotorB(speed, forward)` - Direct motor control
-- `robotForward()`, `robotBackward()`, `robotTurnLeft()`, `robotTurnRight()` - Robot movements
-- `setSpeedLevel(1-10)` - Set speed level
-- `processCommand(String)` - Process serial commands
+#### Motors (Motors.h / Motors.cpp)
+**TB6612 Motor Driver Library**
+- Dual motor control with 10 speed levels (50-1023 PWM)
+- Functions: `robotForward()`, `robotBackward()`, `turnLeft()`, `turnRight()`, `stopAllMotors()`
 
-### IRReading (IRReading.h / IRReading.cpp)
-**CD74HC4067 MUX IR Sensor Array Library for ESP32-S3**
+#### IRReading (IRReading.h / IRReading.cpp)
+**CD74HC4067 MUX IR Sensor Array**
+- 16-channel IR array with automatic calibration
+- Binary threshold detection for line detection
+- Functions: `calibrateIRSensors()`, `readAllIRSensors()`, `getLinePosition()`
 
-Features:
-- 16-channel IR sensor array using MUX
-- Automatic calibration with 10-second procedure
-- Binary threshold detection (black/white)
-- Preset threshold values
-- Continuous reading mode
+#### LineFollow (LineFollow.h / LineFollow.cpp)
+**PD Controller for Line Following**
+- Proportional-Derivative control (tunable Kp, Kd)
+- Weighted position calculation (-7 to +7)
+- Functions: `executeLineFollow()`, `setKp()`, `setKd()`, `toggleLineColor()`
 
-Key Functions:
-- `initIRSensors()` - Initialize MUX and sensors
-- `readAllIRSensors()` - Read all 16 sensor values
-- `readAllIRSensorsBinary()` - Read binary values (0/1)
-- `calibrateIRSensors()` - 10-second calibration routine
-- `toggleIRReading()` - Toggle continuous reading mode
+#### TOFSensors (TOFSensors.h / TOFSensors.cpp)
+**VL53L0X Time-of-Flight Sensor Manager**
+- 3 TOF sensors (Left, Front, Right) via I2C multiplexer
+- Obstacle detection with configurable threshold
+- Functions: `readAll()`, `getLeftDistance()`, `isObstacleFront()`
 
-### LineFollow (LineFollow.h / LineFollow.cpp)
-**PD Controller Line Following Library for ESP32-S3**
+#### I2CMux (I2CMux.h / I2CMux.cpp)
+**PCA9548A I2C Multiplexer Controller**
+- 8-channel I2C multiplexer at address 0x70
+- Enables multiple I2C devices with same address
+- Functions: `selectChannel(0-7)`, `disableAll()`
 
-Features:
-- PD (Proportional-Derivative) controller
-- Weighted line position calculation (-7 to +7)
-- Cross detection (sensors 3-12)
-- Line color inversion support (white on black / black on white)
-- Tunable Kp and Kd parameters
+#### OLEDDisplay (OLEDDisplay.h / OLEDDisplay.cpp)
+**SSD1306 OLED Display Wrapper**
+- 128x64 display at I2C address 0x3C
+- Multiple display modes: status, TOF readings, line following, IR status
+- Functions: `show()`, `showStatus()`, `showTOF()`, `showLineFollowing()`
 
-Key Functions:
-- `initLineFollow()` - Initialize line following system
-- `executeLineFollow()` - Execute PD control (call in loop)
-- `toggleLineFollow()` - Start/stop line following
-- `setKp(value)` / `setKd(value)` - Tune PD parameters
-- `toggleLineColor()` - Switch line color mode
-- `resetCrossDetection()` - Reset cross detection flag
+#### SerialCommands (SerialCommands.h / SerialCommands.cpp)
+**Centralized Command Processing**
+- Complete command-line interface
+- State machine integration
+- Functions: `processSerialCommand()`, `printSerialCommands()`
+
+#### StateMachine (StateMachine.h / StateMachine.cpp)
+**Task State Management**
+- State transitions and mode control
+- Automatic task progression in AUTO mode
+- Functions: `setState()`, `setMode()`, `emergencyStop()`, `progressToNextTask()`
+
+### Task Modules
+
+Each task is a self-contained module with:
+- **Sub-states**: Detailed progress tracking (INIT, execution states, COMPLETED)
+- **Independent execution**: `init()`, `execute()`, `updateDisplay()`
+- **Status tracking**: `isActive()`, `isCompleted()`, `reset()`
+- **OLED feedback**: Real-time sub-state display
+
+#### Task 1: Plantation
+Sub-states: INIT, SEARCHING, FOLLOWING, TURNING, LINE_FOLLOWING, PLANTING, COMPLETED
+
+#### Task 2: Wall Following
+Sub-states: INIT, FIND_WALL, ALIGN, FOLLOWING, CORNER_DETECTED, COMPLETED
+
+#### Task 3: Ramp Navigation
+Sub-states: INIT, APPROACH, CLIMBING, DESCENDING, COMPLETED
+
+#### Task 4: Barcode Reading
+Sub-states: INIT, SEARCHING, ALIGNING, READING, PROCESSING, COMPLETED
+
+#### Task 5: Unloading Balls
+Sub-states: INIT, NAVIGATE_TO_ZONE, ALIGN, UNLOADING, VERIFY, COMPLETED
 
 ## Serial Commands
 
-**Speed Control:**
-- `SPEED1` to `SPEED10` - Set speed level
+### State Machine Control
+- `START` - Enter IDLE state (ready to run tasks)
+- `AUTO` - Enable automatic mode (tasks run sequentially)
+- `MANUAL` - Enable manual mode (command-driven, default)
+- `TASK1` - Start Task 1 (Plantation)
+- `TASK2` - Start Task 2 (Wall Following)
+- `TASK3` - Start Task 3 (Ramp)
+- `TASK4` - Start Task 4 (Barcode Reading)
+- `TASK5` - Start Task 5 (Unloading Balls)
+- `EMERGENCY` - Emergency stop all tasks
+- `RESUME` - Resume from emergency stop
+- `STATUS` - Show current state and mode
 
-**Motor Control:**
+### Speed Control
+- `SPEED1` to `SPEED10` - Set speed level (50-1023 PWM)
+
+### Motor Control
 - `LMF` / `LMB` - Left motor forward/backward
 - `RMF` / `RMB` - Right motor forward/backward
 - `RF` / `RB` - Robot forward/backward
 - `RTL` / `RTR` - Robot turn left/right
 - `STOP` - Stop all motors
 
-**IR Sensors:**
-- `IRCALIBRATE` - Calibrate sensors (10s)
+### IR Sensors
+- `IRCALIBRATE` - Calibrate sensors (10 seconds)
 - `IRREAD` - Toggle continuous raw IR reading
 - `IRREADB` - Toggle continuous binary IR reading
 
-**Line Following:**
+### Line Following
 - `LINEFOLLOW` - Toggle line following mode
-- `INVERTLINE` - Toggle line color
-- `SETP <value>` - Set Kp (e.g., `SETP 15.0`)
-- `SETD <value>` - Set Kd (e.g., `SETD 5.0`)
+- `INVERTLINE` - Toggle line color (white/black)
+- `SETP <value>` - Set proportional gain (e.g., `SETP 15.0`)
+- `SETD <value>` - Set derivative gain (e.g., `SETD 5.0`)
 
-**Help:**
-- `HELP` or `?` - Show command list
+### TOF Sensors
+- `TOFREAD` - Read and display TOF distances
+- `TOFTHRESHOLD <mm>` - Set obstacle threshold (e.g., `TOFTHRESHOLD 200`)
+
+### OLED Display
+- `OLEDCLEAR` - Clear OLED display
+
+### Help
+- `HELP` or `?` - Show complete command list
 
 ## Hardware Configuration
+
+### ESP32-S3 Microcontroller
+- I2C Bus: SDA=8, SCL=9
+- Serial: 115200 baud
 
 ### Motor Driver (TB6612)
 - Motor A (Left): PWMA=4, AIN1=6, AIN2=5
@@ -108,66 +176,110 @@ Key Functions:
 - Select Pins: S0=40, S1=41, S2=42, S3=2
 - 16 IR sensors on MUX channels 0-15
 
-## Usage Example
+### I2C Devices (Shared Bus)
+- **PCA9548A I2C Multiplexer**: Address 0x70
+- **SSD1306 OLED Display**: Address 0x3C, 128x64 pixels
+- **VL53L0X TOF Sensors** (3x): Address 0x29 each
+  - Left TOF: Mux Channel 0
+  - Front TOF: Mux Channel 1
+  - Right TOF: Mux Channel 3
+
+## Quick Start Guide
+
+### 1. Manual Task Testing
+```
+1. Upload code to ESP32-S3
+2. Open Serial Monitor (115200 baud)
+3. Type: START
+4. Type: TASK1 (or TASK2, TASK3, etc.)
+5. Watch OLED for sub-state updates
+6. Use EMERGENCY to stop if needed
+```
+
+### 2. Automatic Mode (Competition Run)
+```
+1. Upload code to ESP32-S3
+2. Type: AUTO
+3. Type: START
+4. Type: TASK1
+5. Robot automatically progresses through all tasks!
+```
+
+### 3. Basic Testing
+```
+1. Test motors: RF, RB, RTL, RTR, STOP
+2. Calibrate IR: IRCALIBRATE (move over black/white for 10s)
+3. Test TOF: TOFREAD
+4. Test line follow: LINEFOLLOW
+5. Check status: STATUS
+```
+
+## Implementing Custom Task Logic
+
+Each task file (`src/tasks/TaskX_Name.cpp`) has this structure:
 
 ```cpp
-#include "src/Motors.h"
-#include "src/IRReading.h"
-#include "src/LineFollow.h"
-
-void setup() {
-  Serial.begin(115200);
-  initMotors();
-  initIRSensors();
-  initLineFollow();
-  setSpeedLevel(5);  // Mid-range speed
-}
-
-void loop() {
-  // Process serial commands
-  if (Serial.available() > 0) {
-    String command = Serial.readStringUntil('\n');
-    processCommand(command);
-  }
+void TaskX::execute() {
+  if (!taskActive) return;
   
-  // Execute line following if active
-  if (isLineFollowActive()) {
-    executeLineFollow();
-  }
-  
-  // Display IR readings if active
-  else if (isIRReadingActive()) {
-    if (irCalibrated) {
-      printIRBinary();
-    } else {
-      printIRValues();
-    }
+  switch(currentSubState) {
+    case TX_INIT:
+      // Your initialization code
+      setSubState(TX_NEXT_STATE);
+      break;
+      
+    case TX_YOUR_STATE:
+      // Your task logic here
+      // Available functions:
+      // - tofSensors.getLeftDistance()
+      // - readIRSensor(0-7)
+      // - robotForward(), turnLeft(), etc.
+      // - executeLineFollow()
+      setSubState(TX_NEXT_STATE);
+      break;
+      
+    case TX_COMPLETED:
+      taskActive = false;
+      break;
   }
 }
 ```
 
-## Calibration Procedure
+## Features
 
-1. Upload the code to ESP32-S3
-2. Open Serial Monitor (115200 baud)
-3. Send command: `IRCALIBRATE`
-4. Move robot over BLACK and WHITE surfaces for 10 seconds
-5. Threshold values are automatically calculated
-6. Ready for line following!
+✅ **Modular Architecture** - Each task is independent and testable  
+✅ **State Machine** - Clean state management with auto-progression  
+✅ **Multi-Sensor Integration** - TOF, IR, and OLED working together  
+✅ **Flexible Control** - Manual testing or automatic competition runs  
+✅ **Real-time Feedback** - OLED shows current task and sub-state  
+✅ **Safety Features** - Emergency stop with resume capability  
+✅ **Comprehensive Commands** - Complete serial interface  
+✅ **Reusable Libraries** - Portable sensor and motor code  
 
-## Line Following Quick Start
+## Documentation
 
-1. Calibrate IR sensors (see above)
-2. Set desired speed: `SPEED5`
-3. Adjust PD parameters if needed: `SETP 15.0`, `SETD 5.0`
-4. Start line following: `LINEFOLLOW`
-5. Stop if needed: `LINEFOLLOW` (toggle off) or `STOP`
+- **STATE_MACHINE_GUIDE.md** - Complete architecture documentation
+- **Task Templates** - All 5 tasks ready for implementation
+- **Serial Commands** - Type `HELP` for full command list
 
-## Notes
+## Development Notes
 
-- Default Kp = 15.0, Kd = 5.0
-- Line center is between sensors 7 and 8
-- Cross detection uses sensors 3-12
-- Position range: -7 (far left) to +7 (far right)
-- Speed range: PWM 50-1023 (levels 1-10)
+- IntelliSense errors for Arduino.h are normal - code compiles fine
+- Each task template has placeholder logic - customize as needed
+- State machine handles automatic progression in AUTO mode
+- OLED updates show sub-states for debugging
+- All existing functionality preserved and integrated
+
+## Competition Workflow
+
+1. **Development**: Implement each task in `src/tasks/`
+2. **Testing**: Use `MANUAL` mode to test tasks individually
+3. **Integration**: Test `AUTO` mode for full run
+4. **Tuning**: Adjust PD parameters, speed, thresholds
+5. **Competition**: Set to `AUTO`, run `START` → `TASK1`
+
+---
+
+**Project Status**: ✅ Complete architecture - Ready for task implementation!  
+**Last Updated**: November 12, 2025
 
