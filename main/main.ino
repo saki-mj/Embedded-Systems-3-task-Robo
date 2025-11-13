@@ -5,6 +5,7 @@
 #include "src/Motors.h"
 #include "src/IRReading.h"
 #include "src/LineFollow.h"
+#include "src/WallFollow.h"
 #include "src/TOFSensors.h"
 #include "src/ColorSensors.h"
 #include "src/PushButton.h"
@@ -47,6 +48,9 @@ void setup() {
   
   // Initialize line following
   initLineFollow();
+  
+  // Initialize wall following
+  wallFollow.init();
   
   // Initialize state machine
   initStateMachine();
@@ -146,11 +150,22 @@ void handlePushButtonControls() {
   if (pushButton.wasPressed(BTN_DOWN)) {
     Serial.println("\n*** EMERGENCY STOP - Button Pressed ***");
     stateMachine.emergencyStop();
+    // Stop all motors
+    stopAllMotors();
+    // Stop all tasks
     task1Plantation.stop();
     task2WallFollow.stop();
     task3Ramp.stop();
     task4Barcode.stop();
     task5Unloading.stop();
+    // Stop line following
+    if (isLineFollowActive()) {
+      toggleLineFollow();
+    }
+    // Stop wall following
+    if (wallFollow.isActive()) {
+      wallFollow.stop();
+    }
     oledDisplay.show("EMERGENCY", "STOP", "BTN DOWN");
     delay(1000);
   }

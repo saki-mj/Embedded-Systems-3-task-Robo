@@ -119,10 +119,28 @@ void stopAllMotors();
 // -------------------------------------------------------------------------
 
 /**
- * @brief Set speed level (1-3)
- * @param level Speed level from 1 to 3
+ * @brief Set speed level (1-12)
+ * @param level Speed level from 1 to 12
  */
 void setSpeedLevel(int level);
+
+/**
+ * @brief Set current speed directly (for advanced control)
+ * @param speed PWM value (0-1023)
+ */
+void setCurrentSpeed(int speed);
+
+/**
+ * @brief Set left motor speed independently (for wall following, etc.)
+ * @param speed PWM value (0-1023)
+ */
+void setLeftMotorSpeed(int speed);
+
+/**
+ * @brief Set right motor speed independently (for wall following, etc.)
+ * @param speed PWM value (0-1023)
+ */
+void setRightMotorSpeed(int speed);
 
 /**
  * @brief Get current speed value in PWM units (0-1023)
@@ -131,9 +149,9 @@ void setSpeedLevel(int level);
 int getCurrentSpeed();
 
 /**
- * @brief Map speed level (1-3) to PWM value (50, 100, 150)
- * @param level Speed level from 1 to 3
- * @return PWM value (50, 100, or 150)
+ * @brief Map speed level (1-12) to PWM value
+ * @param level Speed level from 1 to 12
+ * @return PWM value
  */
 int mapSpeedLevelToPWM(int level);
 

@@ -6,6 +6,7 @@
 #include "Motors.h"
 #include "IRReading.h"
 #include "LineFollow.h"
+#include "WallFollow.h"
 #include "TOFSensors.h"
 #include "ColorSensors.h"
 #include "PushButton.h"
@@ -67,7 +68,21 @@ void processSerialCommand(String command) {
   }
   else if (command == "STOP") {
     stopAllMotors();
-    oledDisplay.show("Robot", "STOPPED");
+    // Stop all tasks
+    task1Plantation.stop();
+    task2WallFollow.stop();
+    task3Ramp.stop();
+    task4Barcode.stop();
+    task5Unloading.stop();
+    // Stop line following
+    if (isLineFollowActive()) {
+      toggleLineFollow();
+    }
+    // Stop wall following
+    if (wallFollow.isActive()) {
+      wallFollow.stop();
+    }
+    oledDisplay.show("Robot", "STOPPED", "All Tasks");
   }
   // IR Sensor Reading
   else if (command == "IRREAD") {
@@ -209,6 +224,73 @@ void processSerialCommand(String command) {
     oledDisplay.show("State", stateMachine.getStateName(stateMachine.getState()), 
                     stateMachine.getMode() == MODE_MANUAL ? "Manual" : "Auto");
   }
+  // Wall Following Configuration
+  else if (command.startsWith("WFKP ")) {
+    float kp = command.substring(5).toFloat();
+    wallFollow.setKp(kp);
+    oledDisplay.show("Wall Follow", "Kp: " + String(kp, 3));
+  }
+  else if (command.startsWith("WFKD ")) {
+    float kd = command.substring(5).toFloat();
+    wallFollow.setKd(kd);
+    oledDisplay.show("Wall Follow", "Kd: " + String(kd, 3));
+  }
+  else if (command.startsWith("WFDIST ")) {
+    uint16_t dist = command.substring(7).toInt();
+    wallFollow.setTargetDistance(dist);
+    oledDisplay.show("Wall Follow", "Target: " + String(dist) + "mm");
+  }
+  // Task 4 Barcode Configuration
+  else if (command.startsWith("T4WALLDIST ")) {
+    uint16_t dist = command.substring(11).toInt();
+    task4Barcode.setWallDetectionDistance(dist);
+    oledDisplay.show("T4 Wall Dist", String(dist) + " mm");
+  }
+  else if (command.startsWith("T4WFOLLOW ")) {
+    uint16_t dist = command.substring(10).toInt();
+    task4Barcode.setWallFollowDistance(dist);
+    oledDisplay.show("T4 WF Dist", String(dist) + " mm");
+  }
+  else if (command.startsWith("T4BARSPEED ")) {
+    uint16_t speed = command.substring(11).toInt();
+    task4Barcode.setBarcodeSpeed(speed);
+    oledDisplay.show("T4 Bar Speed", String(speed));
+  }
+  else if (command.startsWith("T4APPSPEED ")) {
+    uint16_t speed = command.substring(11).toInt();
+    task4Barcode.setApproachSpeed(speed);
+    oledDisplay.show("T4 App Speed", String(speed));
+  }
+  else if (command.startsWith("T4TURNSPEED ")) {
+    uint16_t speed = command.substring(12).toInt();
+    task4Barcode.setTurnSpeed(speed);
+    oledDisplay.show("T4 Turn Speed", String(speed));
+  }
+  else if (command.startsWith("T4TURNRDUR ")) {
+    unsigned long dur = command.substring(11).toInt();
+    task4Barcode.setTurnRightDuration(dur);
+    oledDisplay.show("T4 TurnR Dur", String(dur) + " ms");
+  }
+  else if (command.startsWith("T4TURNLDUR ")) {
+    unsigned long dur = command.substring(11).toInt();
+    task4Barcode.setTurnLeftDuration(dur);
+    oledDisplay.show("T4 TurnL Dur", String(dur) + " ms");
+  }
+  else if (command.startsWith("T4STRAIGHTDUR ")) {
+    unsigned long dur = command.substring(14).toInt();
+    task4Barcode.setStraightDuration(dur);
+    oledDisplay.show("T4 Str Dur", String(dur) + " ms");
+  }
+  else if (command.startsWith("T4REVDUR ")) {
+    unsigned long dur = command.substring(9).toInt();
+    task4Barcode.setReverseDuration(dur);
+    oledDisplay.show("T4 Rev Dur", String(dur) + " ms");
+  }
+  else if (command.startsWith("T4IRTHRESH ")) {
+    uint16_t thresh = command.substring(11).toInt();
+    task4Barcode.setIRWhiteThreshold(thresh);
+    oledDisplay.show("T4 IR Thresh", String(thresh));
+  }
   else if (command == "HELP" || command == "?") {
     printSerialCommands();
   }
@@ -262,6 +344,43 @@ void printSerialCommands() {
   Serial.println();
   Serial.println("OLED Display:");
   Serial.println("  OLEDCLEAR - Clear OLED display");
+  Serial.println();
+  Serial.println("Wall Following Configuration:");
+  Serial.println("  WFKP <value> - Set wall follow Kp gain (1.0)");
+  Serial.println("  WFKD <value> - Set wall follow Kd gain (0.5)");
+  Serial.println("  WFDIST <mm> - Set wall follow target distance (150)");
+  Serial.println();
+  Serial.println("Task 4 Barcode Configuration:");
+  Serial.print("  T4WALLDIST <mm> - Wall detection distance (");
+  Serial.print(task4Barcode.getWallDetectionDistance());
+  Serial.println(")");
+  Serial.print("  T4WFOLLOW <mm> - Wall following target distance (");
+  Serial.print(task4Barcode.getWallFollowDistance());
+  Serial.println(")");
+  Serial.print("  T4BARSPEED <speed> - Barcode reading speed (");
+  Serial.print(task4Barcode.getBarcodeSpeed());
+  Serial.println(")");
+  Serial.print("  T4APPSPEED <speed> - Approach speed (");
+  Serial.print(task4Barcode.getApproachSpeed());
+  Serial.println(")");
+  Serial.print("  T4TURNSPEED <speed> - Turn speed (");
+  Serial.print(task4Barcode.getTurnSpeed());
+  Serial.println(")");
+  Serial.print("  T4TURNRDUR <ms> - Turn RIGHT duration for 90° (");
+  Serial.print(task4Barcode.getTurnRightDuration());
+  Serial.println(")");
+  Serial.print("  T4TURNLDUR <ms> - Turn LEFT duration for 90° (");
+  Serial.print(task4Barcode.getTurnLeftDuration());
+  Serial.println(")");
+  Serial.print("  T4STRAIGHTDUR <ms> - Straight movement duration (");
+  Serial.print(task4Barcode.getStraightDuration());
+  Serial.println(")");
+  Serial.print("  T4REVDUR <ms> - Reverse movement duration (");
+  Serial.print(task4Barcode.getReverseDuration());
+  Serial.println(")");
+  Serial.print("  T4IRTHRESH <value> - IR threshold: >value=white(1) (");
+  Serial.print(task4Barcode.getIRWhiteThreshold());
+  Serial.println(")");
   Serial.println();
   Serial.println("State Machine:");
   Serial.println("  START - Enter IDLE state (ready to run)");
