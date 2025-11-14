@@ -17,6 +17,7 @@
 #include "src/tasks/Task3_Ramp.h"
 #include "src/tasks/Task4_Barcode.h"
 #include "src/tasks/Task5_Unloading.h"
+#include "src/tasks/BallCollector.h"
 
 // -------------------------------------------------------------------------
 // Setup and Loop
@@ -61,6 +62,9 @@ void setup() {
   task3Ramp.init();
   task4Barcode.init();
   task5Unloading.init();
+  
+  // Initialize ball collector
+  ballCollector.init();
   
   // Print available commands
   printSerialCommands();
@@ -158,6 +162,8 @@ void handlePushButtonControls() {
     task3Ramp.stop();
     task4Barcode.stop();
     task5Unloading.stop();
+    // Stop ball collector
+    ballCollector.stop();
     // Stop line following
     if (isLineFollowActive()) {
       toggleLineFollow();
