@@ -52,6 +52,7 @@ bool BallCollector::collectingBall() {
   
   // Step 1: Read IR sensors (to detect ball proximity)
   // int irValue = readIRValue();  // To be implemented
+  // hadapan huththooooooooooo
   Serial.println("Step 1: Reading IR sensors...");
   oledDisplay.show("Step 1", "IR Sensors");
   delay(500);  // Placeholder delay
