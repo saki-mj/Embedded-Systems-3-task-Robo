@@ -3,6 +3,7 @@
  *********************************************************************/
 
 #include "Task1_Plantation.h"
+#include "BallCollector.h"
 #include "../Motors.h"
 #include "../IRReading.h"
 #include "../LineFollow.h"
@@ -71,6 +72,17 @@ void Task1Plantation::execute() {
       // executeLineFollow();
       break;
       
+    case T1_COLLECTING:
+      // Ball collecting logic
+      Serial.println("Task 1: COLLECTING state");
+      // Call ballCollector to collect the ball
+      if (ballCollector.collectingBall()) {
+        // When collection is complete, move to next state
+        // Example: setSubState(T1_PLANTING);
+        // or continue to next collection point
+      }
+      break;
+      
     case T1_PLANTING:
       // Planting logic
       Serial.println("Task 1: PLANTING state");
@@ -121,6 +133,7 @@ String Task1Plantation::getSubStateName() {
     case T1_FOLLOWING: return "FOLLOWING";
     case T1_TURNING: return "TURNING";
     case T1_LINE_FOLLOWING: return "LINE_FOLLOWING";
+    case T1_COLLECTING: return "COLLECTING";
     case T1_PLANTING: return "PLANTING";
     case T1_COMPLETED: return "COMPLETED";
     default: return "UNKNOWN";
@@ -156,4 +169,7 @@ void Task1Plantation::reset() {
   currentSubState = T1_INIT;
   subStateStartTime = millis();
   taskActive = false;
+
+    
+  
 }
