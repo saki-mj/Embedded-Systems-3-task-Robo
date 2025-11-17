@@ -1,6 +1,13 @@
 /*********************************************************************
  * Task 4: Read Barcode Implementation
  *********************************************************************/
+// SERIAL OUTPUT GUIDELINES:
+// - Print status ONCE when entering a new state (use static bool or state tracking)
+// - For time-based actions: print "Action for X ms" ONCE at start
+// - For condition-based actions: print "Action until condition" ONCE at start
+// - Avoid printing inside loops that run every cycle
+// - Low-level motor/sensor functions don't print - task prints context
+/**********************************************************************/
 
 #include "Task4_Barcode.h"
 #include "../Motors.h"
@@ -74,6 +81,9 @@ void Task4Barcode::execute() {
       
       // Start wall following if not already active
       if (!wallFollow.isActive()) {
+        Serial.print("Following left wall until front TOF reads ");
+        Serial.print(wallDetectionDistance);
+        Serial.println(" mm");
         wallFollow.start();
       }
       
@@ -84,7 +94,7 @@ void Task4Barcode::execute() {
       
       // Only change state when FRONT TOF detects wall
       if (tofSensors.getFrontDistance() <= wallDetectionDistance) {
-        Serial.print("Wall 1 detected at: ");
+        Serial.print("Wall 1 detected at ");
         Serial.print(tofSensors.getFrontDistance());
         Serial.println(" mm");
         wallFollow.stop();
@@ -97,13 +107,24 @@ void Task4Barcode::execute() {
       
     case T4_TURNING_RIGHT1:
       // Turn right 90 degrees
-      setCurrentSpeed(turnSpeed);
-      robotTurnRight();
-      
-      if (isTurnComplete()) {
-        stopAllMotors();
-        delay(300);
-        setSubState(T4_SEARCHING_WALL2);
+      {
+        static bool printedOnce = false;
+        if (!printedOnce) {
+          Serial.print("Turning right 90° for ");
+          Serial.print(turnRightDuration);
+          Serial.println(" ms");
+          printedOnce = true;
+        }
+        
+        setCurrentSpeed(turnSpeed);
+        robotTurnRight();
+        
+        if (isTurnComplete()) {
+          stopAllMotors();
+          delay(300);
+          printedOnce = false;
+          setSubState(T4_SEARCHING_WALL2);
+        }
       }
       break;
       
@@ -113,6 +134,9 @@ void Task4Barcode::execute() {
       
       // Start wall following if not already active
       if (!wallFollow.isActive()) {
+        Serial.print("Following left wall until front TOF reads ");
+        Serial.print(wallDetectionDistance);
+        Serial.println(" mm");
         wallFollow.start();
       }
       
@@ -123,7 +147,7 @@ void Task4Barcode::execute() {
       
       // Only change state when FRONT TOF detects wall
       if (tofSensors.getFrontDistance() <= wallDetectionDistance) {
-        Serial.print("Wall 2 detected at: ");
+        Serial.print("Wall 2 detected at ");
         Serial.print(tofSensors.getFrontDistance());
         Serial.println(" mm");
         wallFollow.stop();
@@ -136,26 +160,48 @@ void Task4Barcode::execute() {
       
     case T4_TURNING_LEFT2:
       // Turn left 90 degrees
-      setCurrentSpeed(turnSpeed);
-      robotTurnLeft();
-      
-      if (isTurnComplete()) {
-        stopAllMotors();
-        delay(300);
-        setSubState(T4_MOVING_REVERSE);
-        reverseStartTime = millis();
+      {
+        static bool printedOnce = false;
+        if (!printedOnce) {
+          Serial.print("Turning left 90° for ");
+          Serial.print(turnLeftDuration);
+          Serial.println(" ms");
+          printedOnce = true;
+        }
+        
+        setCurrentSpeed(turnSpeed);
+        robotTurnLeft();
+        
+        if (isTurnComplete()) {
+          stopAllMotors();
+          delay(300);
+          printedOnce = false;
+          setSubState(T4_MOVING_REVERSE);
+          reverseStartTime = millis();
+        }
       }
       break;
       
     case T4_MOVING_REVERSE:
       // Move reverse for configured time
-      setCurrentSpeed(approachSpeed);
-      robotBackward();
-      
-      if (currentTime - reverseStartTime >= reverseDuration) {
-        stopAllMotors();
-        delay(300);
-        setSubState(T4_ALIGNING);
+      {
+        static bool printedOnce = false;
+        if (!printedOnce) {
+          Serial.print("Moving reverse for ");
+          Serial.print(reverseDuration);
+          Serial.println(" ms");
+          printedOnce = true;
+        }
+        
+        setCurrentSpeed(approachSpeed);
+        robotBackward();
+        
+        if (currentTime - reverseStartTime >= reverseDuration) {
+          stopAllMotors();
+          delay(300);
+          printedOnce = false;
+          setSubState(T4_ALIGNING);
+        }
       }
       break;
       
@@ -175,15 +221,24 @@ void Task4Barcode::execute() {
       
     case T4_READING:
       // Move forward at constant speed and read barcode
-      setCurrentSpeed(barcodeSpeed);
-      robotForward();
-      readBarcodeBar();
-      
-      // Check if barcode reading is complete
-      if (barcodeReadComplete) {
-        stopAllMotors();
-        Serial.println("Barcode reading complete!");
-        setSubState(T4_PROCESSING);
+      {
+        static bool printedOnce = false;
+        if (!printedOnce) {
+          Serial.println("Reading barcode while moving forward...");
+          printedOnce = true;
+        }
+        
+        setCurrentSpeed(barcodeSpeed);
+        robotForward();
+        readBarcodeBar();
+        
+        // Check if barcode reading is complete
+        if (barcodeReadComplete) {
+          stopAllMotors();
+          Serial.println("Barcode reading complete!");
+          printedOnce = false;
+          setSubState(T4_PROCESSING);
+        }
       }
       break;
       

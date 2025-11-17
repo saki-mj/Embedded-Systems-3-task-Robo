@@ -1,23 +1,27 @@
 #include "I2CMux.h"
 
 // Constructor
-I2CMux::I2CMux(uint8_t address, uint8_t pinSDA, uint8_t pinSCL) {
+I2CMux::I2CMux(uint8_t address, uint8_t pinSDA, uint8_t pinSCL, uint32_t frequency) {
   muxAddress = address;
   sdaPin = pinSDA;
   sclPin = pinSCL;
+  i2cFrequency = frequency;
   currentChannel = 255; // Invalid channel initially
 }
 
 // Initialize the multiplexer
 void I2CMux::begin() {
-  // Initialize I2C bus with ESP32-S3 specific pins
-  Wire.begin(sdaPin, sclPin);
+  // Initialize I2C bus with ESP32-S3 specific pins and frequency
+  Wire.begin(sdaPin, sclPin, i2cFrequency);
   delay(100);
   
-  Serial.print("I2C initialized - SDA:");
+  Serial.print("I2C initialized - SDA: GPIO");
   Serial.print(sdaPin);
-  Serial.print(" SCL:");
-  Serial.println(sclPin);
+  Serial.print(", SCL: GPIO");
+  Serial.print(sclPin);
+  Serial.print(", Frequency: ");
+  Serial.print(i2cFrequency);
+  Serial.println(" Hz");
   
   // Check if PCA9548A is connected
   if (isConnected()) {
@@ -46,6 +50,23 @@ void I2CMux::selectChannel(uint8_t channel) {
   
   currentChannel = channel;
   delay(10); // Small delay for channel to stabilize
+}
+
+// Enable multiple channels at once (use with caution!)
+void I2CMux::selectMultipleChannels(uint8_t channelMask) {
+  Wire.beginTransmission(muxAddress);
+  Wire.write(channelMask); // e.g., 0b00000011 enables channels 0 and 1
+  Wire.endTransmission();
+  delay(10);
+}
+
+// Read which channels are currently enabled
+uint8_t I2CMux::readEnabledChannels() {
+  Wire.requestFrom(muxAddress, (uint8_t)1);
+  if (Wire.available()) {
+    return Wire.read();
+  }
+  return 0;
 }
 
 // Disable all channels
