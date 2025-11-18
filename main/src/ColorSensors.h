@@ -2,8 +2,8 @@
  * Color Sensors Library - TCS34725 RGB Color Sensors
  * 
  * Two TCS34725 sensors connected via PCA9548A I2C Multiplexer:
- * - Bottom sensor on Channel 4
- * - Top sensor on Channel 2
+ * - Bottom sensor on Channel 5
+ * - Top sensor on Channel 1
  * 
  * I2C Address: 0x29 (both sensors, isolated by mux)
  *********************************************************************/
@@ -16,8 +16,8 @@
 #include "I2CMux.h"
 
 // Color sensor channels on I2C multiplexer
-#define BOTTOM_COLOR_CHANNEL 4
-#define TOP_COLOR_CHANNEL 2
+#define BOTTOM_COLOR_CHANNEL 5
+#define TOP_COLOR_CHANNEL 1
 
 // Color sensor I2C address (default for TCS34725)
 #define TCS34725_ADDRESS 0x29
