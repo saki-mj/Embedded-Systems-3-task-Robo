@@ -32,6 +32,9 @@ class Task1Plantation {
     uint16_t searchSpeed;
     uint16_t followSpeed;
     uint16_t turnSpeed;
+    float searchSpeedMultiplier;  // Relative to base speed (1.0 = same as base)
+    float followSpeedMultiplier;  // Relative to base speed (1.0 = same as base)
+    float turnSpeedMultiplier;    // Relative to base speed (0.8 = 80% of base)
     unsigned long turnDuration;
     unsigned long searchDuration;
     unsigned long collectDuration;
@@ -68,6 +71,9 @@ class Task1Plantation {
     void setSearchSpeed(uint16_t speed);
     void setFollowSpeed(uint16_t speed);
     void setTurnSpeed(uint16_t speed);
+    void setSearchSpeedMultiplier(float mult);
+    void setFollowSpeedMultiplier(float mult);
+    void setTurnSpeedMultiplier(float mult);
     void setTurnDuration(unsigned long timeMs);
     void setSearchDuration(unsigned long timeMs);
     void setCollectDuration(unsigned long timeMs);
@@ -77,6 +83,9 @@ class Task1Plantation {
     uint16_t getSearchSpeed();
     uint16_t getFollowSpeed();
     uint16_t getTurnSpeed();
+    float getSearchSpeedMultiplier();
+    float getFollowSpeedMultiplier();
+    float getTurnSpeedMultiplier();
     unsigned long getTurnDuration();
     unsigned long getSearchDuration();
     unsigned long getCollectDuration();
@@ -87,6 +96,7 @@ void T1_setTurn90Time(unsigned long ms);
 void T1_setTurn180Time(unsigned long ms);
 void T1_setBackupTime(unsigned long ms);
 void T1_setExitForwardTime(unsigned long ms);
+void T1_setIntersectionWhiteMin(int min);
 
 };
 
@@ -98,7 +108,6 @@ extern unsigned long T1_TURN_90_TIME_MS;
 extern unsigned long T1_TURN_180_TIME_MS;
 extern unsigned long T1_BACKUP_TIME_MS;
 extern unsigned long T1_EXIT_FORWARD_TIME_MS;
-extern int T1_SPEED_LEVEL;                 // default speed level used by Task1
 extern int T1_INTERSECTION_WHITE_MIN;      // how many white sensors = "intersection"
 
 #endif

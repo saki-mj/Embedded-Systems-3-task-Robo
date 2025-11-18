@@ -19,7 +19,7 @@
 /**********************************************************************/
 
 #include "Task1_Plantation.h"
-// #include "BallCollector.h"   // Not used in this version
+//#include "BallCollector.h"   // Not used in this version
 #include "../Motors.h"
 #include "../IRReading.h"
 #include "../LineFollow.h"
@@ -45,9 +45,6 @@ unsigned long T1_TURN_90_TIME_MS      = 2000;   // 90° turn
 unsigned long T1_TURN_180_TIME_MS     = 3500;  // 180° turn
 unsigned long T1_BACKUP_TIME_MS       = 1500;  // backup after aligning with a line
 unsigned long T1_EXIT_FORWARD_TIME_MS = 3000;  // final straight exit
-
-// Task1 runtime-configurable defaults
-int T1_SPEED_LEVEL = 6;                     // default speed level used by Task1
 
 // Plantation grid settings
 const int T1_INTERSECTIONS_PER_LINE   = 3;   // 3 intersections in each vertical line
@@ -89,12 +86,6 @@ void T1_setExitForwardTime(unsigned long ms) {
   Serial.println(ms);
 }
 
-void T1_setSpeedLevel(int level) {
-  T1_SPEED_LEVEL = level;
-  Serial.print("Updated T1 Speed Level: ");
-  Serial.println(level);
-}
-
 void T1_setIntersectionWhiteMin(int min) {
   T1_INTERSECTION_WHITE_MIN = min;
   Serial.print("Updated T1 Intersection White Min: ");
@@ -109,10 +100,12 @@ Task1Plantation::Task1Plantation() {
   subStateStartTime = 0;
   taskActive = false;
   
-  // Default configuration (can be changed via serial commands)
-  searchSpeed = 60;
-  followSpeed = 70;
-  turnSpeed = 55;
+  // Speed multipliers relative to base speed (can be changed via serial commands)
+  searchSpeedMultiplier = 1.0;   // Same as base speed
+  followSpeedMultiplier = 1.0;   // Same as base speed for line following
+  turnSpeedMultiplier = 0.8;     // 80% of base speed for turns
+  
+  // Timing configuration
   turnDuration = 1000;  // 1 second for 90° turn
   searchDuration = 5000;  // 5 seconds search time
   collectDuration = 2000;  // 2 seconds collection time
@@ -134,7 +127,20 @@ void Task1Plantation::init() {
   t1ReturningAlongLine = false;
   t1IntersectionLatched= false;
 
-  setSpeedLevel(T1_SPEED_LEVEL);   // medium speed (tune if needed)
+  // Calculate actual speeds based on current base speed
+  int baseSpeed = getCurrentSpeed();
+  searchSpeed = baseSpeed * searchSpeedMultiplier;
+  followSpeed = baseSpeed * followSpeedMultiplier;
+  turnSpeed = baseSpeed * turnSpeedMultiplier;
+  
+  Serial.print("Task1 speeds - Base: ");
+  Serial.print(baseSpeed);
+  Serial.print(", Search: ");
+  Serial.print(searchSpeed);
+  Serial.print(", Follow: ");
+  Serial.print(followSpeed);
+  Serial.print(", Turn: ");
+  Serial.println(turnSpeed);
 
   oledDisplay.show("Task 1", "Plantation", "Initialized");
   delay(1000);
@@ -160,7 +166,6 @@ void Task1Plantation::execute() {
       t1ReturningAlongLine = false;
       t1IntersectionLatched= false;
 
-      setSpeedLevel(T1_SPEED_LEVEL);   // moderate speed
       robotForward();     // move from yellow start head into arena
 
       // Go to SEARCHING: move forward until IR 3..15 see the white line
@@ -522,6 +527,22 @@ String Task1Plantation::getSubStateName() {
 // Start task
 void Task1Plantation::start() {
   Serial.println("Starting Task 1: Plantation");
+  
+  // Recalculate speeds based on current robot base speed
+  int baseSpeed = getCurrentSpeed();
+  searchSpeed = baseSpeed * searchSpeedMultiplier;
+  followSpeed = baseSpeed * followSpeedMultiplier;
+  turnSpeed = baseSpeed * turnSpeedMultiplier;
+  
+  Serial.print("Task1 using base speed: ");
+  Serial.print(baseSpeed);
+  Serial.print(" -> Search: ");
+  Serial.print(searchSpeed);
+  Serial.print(", Follow: ");
+  Serial.print(followSpeed);
+  Serial.print(", Turn: ");
+  Serial.println(turnSpeed);
+  
   taskActive = true;
   setSubState(T1_INIT);
 }
@@ -552,21 +573,45 @@ void Task1Plantation::reset() {
 
 // Configuration setters
 void Task1Plantation::setSearchSpeed(uint16_t speed) {
+  // Set absolute speed value (for backward compatibility)
   searchSpeed = speed;
+  int baseSpeed = getCurrentSpeed();
+  if (baseSpeed > 0) {
+    searchSpeedMultiplier = (float)speed / baseSpeed;
+  }
   Serial.print("T1 Search speed set to: ");
-  Serial.println(speed);
+  Serial.print(speed);
+  Serial.print(" (multiplier: ");
+  Serial.print(searchSpeedMultiplier, 2);
+  Serial.println(")");
 }
 
 void Task1Plantation::setFollowSpeed(uint16_t speed) {
+  // Set absolute speed value (for backward compatibility)
   followSpeed = speed;
+  int baseSpeed = getCurrentSpeed();
+  if (baseSpeed > 0) {
+    followSpeedMultiplier = (float)speed / baseSpeed;
+  }
   Serial.print("T1 Follow speed set to: ");
-  Serial.println(speed);
+  Serial.print(speed);
+  Serial.print(" (multiplier: ");
+  Serial.print(followSpeedMultiplier, 2);
+  Serial.println(")");
 }
 
 void Task1Plantation::setTurnSpeed(uint16_t speed) {
+  // Set absolute speed value (for backward compatibility)
   turnSpeed = speed;
+  int baseSpeed = getCurrentSpeed();
+  if (baseSpeed > 0) {
+    turnSpeedMultiplier = (float)speed / baseSpeed;
+  }
   Serial.print("T1 Turn speed set to: ");
-  Serial.println(speed);
+  Serial.print(speed);
+  Serial.print(" (multiplier: ");
+  Serial.print(turnSpeedMultiplier, 2);
+  Serial.println(")");
 }
 
 void Task1Plantation::setTurnDuration(unsigned long timeMs) {
@@ -623,4 +668,51 @@ unsigned long Task1Plantation::getCollectDuration() {
 
 uint16_t Task1Plantation::getBallDetectionThreshold() {
   return ballDetectionThreshold;
+}
+
+// Speed multiplier setters
+void Task1Plantation::setSearchSpeedMultiplier(float mult) {
+  searchSpeedMultiplier = mult;
+  int baseSpeed = getCurrentSpeed();
+  searchSpeed = baseSpeed * searchSpeedMultiplier;
+  Serial.print("T1 Search speed multiplier set to: ");
+  Serial.print(mult, 2);
+  Serial.print("x (speed: ");
+  Serial.print(searchSpeed);
+  Serial.println(")");
+}
+
+void Task1Plantation::setFollowSpeedMultiplier(float mult) {
+  followSpeedMultiplier = mult;
+  int baseSpeed = getCurrentSpeed();
+  followSpeed = baseSpeed * followSpeedMultiplier;
+  Serial.print("T1 Follow speed multiplier set to: ");
+  Serial.print(mult, 2);
+  Serial.print("x (speed: ");
+  Serial.print(followSpeed);
+  Serial.println(")");
+}
+
+void Task1Plantation::setTurnSpeedMultiplier(float mult) {
+  turnSpeedMultiplier = mult;
+  int baseSpeed = getCurrentSpeed();
+  turnSpeed = baseSpeed * turnSpeedMultiplier;
+  Serial.print("T1 Turn speed multiplier set to: ");
+  Serial.print(mult, 2);
+  Serial.print("x (speed: ");
+  Serial.print(turnSpeed);
+  Serial.println(")");
+}
+
+// Speed multiplier getters
+float Task1Plantation::getSearchSpeedMultiplier() {
+  return searchSpeedMultiplier;
+}
+
+float Task1Plantation::getFollowSpeedMultiplier() {
+  return followSpeedMultiplier;
+}
+
+float Task1Plantation::getTurnSpeedMultiplier() {
+  return turnSpeedMultiplier;
 }

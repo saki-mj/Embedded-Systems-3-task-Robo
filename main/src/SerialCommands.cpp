@@ -317,6 +317,21 @@ void processSerialCommand(String command) {
     task1Plantation.setTurnSpeed(speed);
     oledDisplay.show("T1 Turn Spd", String(speed));
   }
+  else if (command.startsWith("T1SEARCHMULT ")) {
+    float mult = command.substring(13).toFloat();
+    task1Plantation.setSearchSpeedMultiplier(mult);
+    oledDisplay.show("T1 Search Mult", String(mult, 2) + "x");
+  }
+  else if (command.startsWith("T1FOLLOWMULT ")) {
+    float mult = command.substring(13).toFloat();
+    task1Plantation.setFollowSpeedMultiplier(mult);
+    oledDisplay.show("T1 Follow Mult", String(mult, 2) + "x");
+  }
+  else if (command.startsWith("T1TURNMULT ")) {
+    float mult = command.substring(11).toFloat();
+    task1Plantation.setTurnSpeedMultiplier(mult);
+    oledDisplay.show("T1 Turn Mult", String(mult, 2) + "x");
+  }
   else if (command.startsWith("T1TURNDUR ")) {
     unsigned long dur = command.substring(10).toInt();
     task1Plantation.setTurnDuration(dur);
@@ -552,6 +567,15 @@ void printSerialCommands() {
   Serial.print("  T1TURNSPD <speed> - Turn speed (");
   Serial.print(task1Plantation.getTurnSpeed());
   Serial.println(")");
+  Serial.print("  T1SEARCHMULT <mult> - Search speed multiplier (");
+  Serial.print(task1Plantation.getSearchSpeedMultiplier(), 2);
+  Serial.println("x base)");
+  Serial.print("  T1FOLLOWMULT <mult> - Follow speed multiplier (");
+  Serial.print(task1Plantation.getFollowSpeedMultiplier(), 2);
+  Serial.println("x base)");
+  Serial.print("  T1TURNMULT <mult> - Turn speed multiplier (");
+  Serial.print(task1Plantation.getTurnSpeedMultiplier(), 2);
+  Serial.println("x base)");
   Serial.print("  T1TURNDUR <ms> - Turn duration for 90° (");
   Serial.print(task1Plantation.getTurnDuration());
   Serial.println(")");

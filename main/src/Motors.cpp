@@ -156,7 +156,7 @@ void stopAllMotors() {
 // -------------------------------------------------------------------------
 
 void setSpeedLevel(int level) {
-  // Clamp level to valid range (1-12)
+  // Clamp level to valid range (1-20)
   if (level < 1) level = 1;
   if (level > speedLevels) level = speedLevels;
   
@@ -193,21 +193,30 @@ void setRightMotorSpeed(int speed) {
 }
 
 int mapSpeedLevelToPWM(int level) {
-
+  // Levels 1-11 are explicitly defined
+  // Levels 12-20 are linearly interpolated from 400 to 1023
   switch(level) {
     case 1: return 40;
-    case 2: return 45;
-    case 3: return 50;
+    case 2: return 50;
+    case 3: return 60;
     case 4: return 75;
     case 5: return 100;
-    case 6: return 200;
-    case 7: return 337;   // 200 + (1023-200)/6 * 1
-    case 8: return 474;   // 200 + (1023-200)/6 * 2
-    case 9: return 611;   // 200 + (1023-200)/6 * 3
-    case 10: return 748;  // 200 + (1023-200)/6 * 4
-    case 11: return 885;  // 200 + (1023-200)/6 * 5
-    case 12: return 1023; // Maximum speed
-    default: return 25;   // Default to level 1
+    case 6: return 150;
+    case 7: return 200;
+    case 8: return 250;
+    case 9: return 300;
+    case 10: return 350;
+    case 11: return 400;
+    case 12: return 469;   // 400 + (1023-400)/9 * 1 = 400 + 69.2 * 1
+    case 13: return 538;   // 400 + (1023-400)/9 * 2 = 400 + 69.2 * 2
+    case 14: return 608;   // 400 + (1023-400)/9 * 3 = 400 + 69.2 * 3
+    case 15: return 677;   // 400 + (1023-400)/9 * 4 = 400 + 69.2 * 4
+    case 16: return 746;   // 400 + (1023-400)/9 * 5 = 400 + 69.2 * 5
+    case 17: return 815;   // 400 + (1023-400)/9 * 6 = 400 + 69.2 * 6
+    case 18: return 885;   // 400 + (1023-400)/9 * 7 = 400 + 69.2 * 7
+    case 19: return 954;   // 400 + (1023-400)/9 * 8 = 400 + 69.2 * 8
+    case 20: return 1023;  // Maximum speed
+    default: return 40;    // Default to level 1
   }
 }
 

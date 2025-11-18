@@ -31,7 +31,7 @@ const int freq = 30000;    // PWM frequency in Hz (30 kHz)
 // --- Speed Settings ---
 const int minSpeedPWM = 25;    // Minimum PWM value (speed level 1)
 const int maxSpeedPWM = 1023;  // Maximum PWM value (10-bit)
-const int speedLevels = 12;    // Number of speed levels (1-12)
+const int speedLevels = 20;    // Number of speed levels (1-20)
 
 // -------------------------------------------------------------------------
 // Global Variables
@@ -119,8 +119,8 @@ void stopAllMotors();
 // -------------------------------------------------------------------------
 
 /**
- * @brief Set speed level (1-12)
- * @param level Speed level from 1 to 12
+ * @brief Set speed level (1-20)
+ * @param level Speed level from 1 to 20
  */
 void setSpeedLevel(int level);
 
@@ -149,8 +149,8 @@ void setRightMotorSpeed(int speed);
 int getCurrentSpeed();
 
 /**
- * @brief Map speed level (1-12) to PWM value
- * @param level Speed level from 1 to 12
+ * @brief Map speed level (1-20) to PWM value
+ * @param level Speed level from 1 to 20
  * @return PWM value
  */
 int mapSpeedLevelToPWM(int level);
