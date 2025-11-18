@@ -1,9 +1,18 @@
 /*********************************************************************
  * Task 1: Plantation Task Implementation
+ * Path:
+ *  - Find main line, 90° right, backup 1000 ms.
+ *  - For each of 4 lines:
+ *      * Go DOWN: line follow, 3 intersections, read color+OLED.
+ *      * On 3rd: 180° right, come back UP (no color).
+ *      * On 3rd again (top):
+ *          - If line 1..3: 90° right, move to next line, 90° right,
+ *            backup 1000 ms, repeat.
+ *          - If line 4: 90° right, forward 3000 ms, COMPLETED.
  *********************************************************************/
 
 #include "Task1_Plantation.h"
-#include "BallCollector.h"
+// #include "BallCollector.h"   // Not used in this version
 #include "../Motors.h"
 #include "../IRReading.h"
 #include "../LineFollow.h"
@@ -24,25 +33,66 @@ enum T1TurnCommand {
   T1_TURN_180
 };
 
-// Tunable timings (milliseconds)  --- tune these on the robot ---
-const unsigned long T1_TURN_90_TIME_MS  = 500;   // 90° turn (tune)
-const unsigned long T1_TURN_180_TIME_MS = 1000;  // 180° turn (tune)
-const unsigned long T1_BACKUP_TIME_MS   = 1000;  // backup after first 90°
+// Tunable timings (milliseconds)  --- you can change / tune these ---
+unsigned long T1_TURN_90_TIME_MS      = 2000;   // 90° turn
+unsigned long T1_TURN_180_TIME_MS     = 3500;  // 180° turn
+unsigned long T1_BACKUP_TIME_MS       = 1500;  // backup after aligning with a line
+unsigned long T1_EXIT_FORWARD_TIME_MS = 3000;  // final straight exit
+
+// Task1 runtime-configurable defaults
+int T1_SPEED_LEVEL = 6;                     // default speed level used by Task1
 
 // Plantation grid settings
-const int T1_NUM_INTERSECTIONS      = 5;   // intersections per column (vertical)
-const int T1_NUM_COLUMNS            = 6;   // total columns to cover
-const int T1_INTERSECTION_WHITE_MIN = 7;   // how many white sensors = "intersection"
+const int T1_INTERSECTIONS_PER_LINE   = 3;   // 3 intersections in each vertical line
+const int T1_NUM_LINES                = 4;   // 4 vertical lines total
+int T1_INTERSECTION_WHITE_MIN   = 7;         // how many white sensors = "intersection" (runtime configurable)
 
 // State for current plantation sweep
-static T1TurnCommand  t1PendingTurn         = T1_TURN_NONE;
-static Task1SubState  t1NextStateAfterTurn  = T1_LINE_FOLLOWING;
+static T1TurnCommand  t1PendingTurn        = T1_TURN_NONE;
+static Task1SubState  t1NextStateAfterTurn = T1_LINE_FOLLOWING;
 
-static int  t1ColumnIndex           = 0;   // 0..5 (6 columns)
-static int  t1IntersectionCount     = 0;   // number of intersections in this direction
-static bool t1ReturningAlongColumn  = false; // false = going down, true = coming back up
-static bool t1IntersectionLatched   = false; // avoid double-counting one intersection
+static int  t1CurrentLine          = 0;   // 0..3 (4 lines)
+static int  t1IntersectionCount    = 0;   // number of intersections in current direction
+static bool t1ReturningAlongLine   = false; // false = going down, true = coming back up
+static bool t1IntersectionLatched  = false; // avoid double-counting same intersection
 
+// ---------- SETTER FUNCTIONS FOR SERIAL TUNING ----------
+
+void T1_setTurn90Time(unsigned long ms) {
+  T1_TURN_90_TIME_MS = ms;
+  Serial.print("Updated T1 90° Turn Time: ");
+  Serial.println(ms);
+}
+
+void T1_setTurn180Time(unsigned long ms) {
+  T1_TURN_180_TIME_MS = ms;
+  Serial.print("Updated T1 180° Turn Time: ");
+  Serial.println(ms);
+}
+
+void T1_setBackupTime(unsigned long ms) {
+  T1_BACKUP_TIME_MS = ms;
+  Serial.print("Updated T1 Backup Time: ");
+  Serial.println(ms);
+}
+
+void T1_setExitForwardTime(unsigned long ms) {
+  T1_EXIT_FORWARD_TIME_MS = ms;
+  Serial.print("Updated T1 Exit Forward Time: ");
+  Serial.println(ms);
+}
+
+void T1_setSpeedLevel(int level) {
+  T1_SPEED_LEVEL = level;
+  Serial.print("Updated T1 Speed Level: ");
+  Serial.println(level);
+}
+
+void T1_setIntersectionWhiteMin(int min) {
+  T1_INTERSECTION_WHITE_MIN = min;
+  Serial.print("Updated T1 Intersection White Min: ");
+  Serial.println(min);
+}
 
 // ---------- Plantation task main methods ----------
 
@@ -61,14 +111,14 @@ void Task1Plantation::init() {
   taskActive = false;
 
   // Reset plantation sweep state
-  t1PendingTurn           = T1_TURN_NONE;
-  t1NextStateAfterTurn    = T1_LINE_FOLLOWING;
-  t1ColumnIndex           = 0;
-  t1IntersectionCount     = 0;
-  t1ReturningAlongColumn  = false;
-  t1IntersectionLatched   = false;
+  t1PendingTurn        = T1_TURN_NONE;
+  t1NextStateAfterTurn = T1_LINE_FOLLOWING;
+  t1CurrentLine        = 0;
+  t1IntersectionCount  = 0;
+  t1ReturningAlongLine = false;
+  t1IntersectionLatched= false;
 
-  setSpeedLevel(6);   // medium speed (tune if needed)
+  setSpeedLevel(T1_SPEED_LEVEL);   // medium speed (tune if needed)
 
   oledDisplay.show("Task 1", "Plantation", "Initialized");
   delay(1000);
@@ -87,15 +137,14 @@ void Task1Plantation::execute() {
     case T1_INIT: {
       Serial.println("Task 1: INIT state");
 
-      // Reset plantation sweep state
-      t1PendingTurn           = T1_TURN_NONE;
-      t1NextStateAfterTurn    = T1_LINE_FOLLOWING;
-      t1ColumnIndex           = 0;   // first column
-      t1IntersectionCount     = 0;
-      t1ReturningAlongColumn  = false;
-      t1IntersectionLatched   = false;
+      t1PendingTurn        = T1_TURN_NONE;
+      t1NextStateAfterTurn = T1_LINE_FOLLOWING;
+      t1CurrentLine        = 0;
+      t1IntersectionCount  = 0;
+      t1ReturningAlongLine = false;
+      t1IntersectionLatched= false;
 
-      setSpeedLevel(6);   // moderate speed
+      setSpeedLevel(T1_SPEED_LEVEL);   // moderate speed
       robotForward();     // move from yellow start head into arena
 
       // Go to SEARCHING: move forward until IR 3..15 see the white line
@@ -127,7 +176,7 @@ void Task1Plantation::execute() {
         Serial.println("Task 1: main line detected, prepare 90 deg right");
         stopAllMotors();
         t1PendingTurn        = T1_TURN_RIGHT_90;
-        t1NextStateAfterTurn = T1_FOLLOWING;   // backup 1 s then line follow
+        t1NextStateAfterTurn = T1_FOLLOWING;   // backup 1 s then line follow on line 1
         setSubState(T1_TURNING);
       }
       break;
@@ -135,23 +184,21 @@ void Task1Plantation::execute() {
 
     // -----------------------------------------------------------
     // 3) FOLLOWING (used here as "BACKUP then go to LINE_FOLLOWING")
-    //    - after first 90° turn: come back 1000 ms then go forward
+    //    - after each 90° turn into a vertical line: go back 1000 ms
     // -----------------------------------------------------------
     case T1_FOLLOWING: {
-      Serial.println("Task 1: FOLLOWING (BACKUP) state");
       unsigned long elapsed = millis() - subStateStartTime;
 
       if (elapsed < T1_BACKUP_TIME_MS) {
         // "robo car come back 1000ms"
         robotBackward();
       } else {
-        // Backup finished -> start moving forward along first column
-        Serial.println("Task 1: backup done, start LINE_FOLLOWING");
-        t1IntersectionCount     = 0;
-        t1ReturningAlongColumn  = false;
-        t1IntersectionLatched   = false;
+        // Backup finished -> start moving forward along current line
+        Serial.println("Task 1: backup done, start LINE_FOLLOWING on line");
+        t1IntersectionCount    = 0;
+        t1ReturningAlongLine   = false;  // going DOWN the line
+        t1IntersectionLatched  = false;
 
-        // start line follow on the column
         setSubState(T1_LINE_FOLLOWING);
       }
       break;
@@ -209,21 +256,18 @@ void Task1Plantation::execute() {
     }
 
     // -----------------------------------------------------------
-    // 5) LINE_FOLLOWING:
-    //    - follow the line in current column
-    //    - going DOWN first, then UP after 180°
-    //    - detect intersections (5 per column)
-    //    - at each intersection: read color sensor
-    //      * if GREEN -> go to COLLECTING (BallCollector.cpp)
-    //      * if no GREEN:
-    //          - at 5th intersection while going down:
-    //                -> 180° turn and come back up same column
-    //          - at 5th intersection while coming back up:
-    //                -> 90° right turn to next column
-    //                -> after last column, 90° right to exit (COMPLETED)
+    // 5) LINE_FOLLOWING on a vertical line:
+    //    - DOWN first (t1ReturningAlongLine = false)
+    //      * read color + OLED at every intersection
+    //      * at 3rd intersection: 180° and come back up
+    //    - UP after 180° (t1ReturningAlongLine = true)
+    //      * only count intersections, no color
+    //      * at 3rd intersection again (top):
+    //          - lines 1..3: move to next line (two 90° rights)
+    //          - line 4: 90° right and exit forward 3000 ms
     // -----------------------------------------------------------
     case T1_LINE_FOLLOWING: {
-      // 1) Keep line following
+      // 1) Keep line following on current line
       executeLineFollow();    // PD line follow from LineFollow.h
 
       // 2) Detect intersection with IR array
@@ -242,72 +286,73 @@ void Task1Plantation::execute() {
 
         Serial.print("Task 1: Intersection #");
         Serial.print(t1IntersectionCount);
-        Serial.print(" on column ");
-        Serial.print(t1ColumnIndex);
+        Serial.print(" on line ");
+        Serial.print(t1CurrentLine + 1);
         Serial.print(" (returning = ");
-        Serial.print(t1ReturningAlongColumn ? "true" : "false");
+        Serial.print(t1ReturningAlongLine ? "true" : "false");
         Serial.println(")");
 
-        // 3) At every intersection: read color (bottom sensor)
-        DetectedColor col = COLOR_UNKNOWN;
-        if (colorSensors.isBottomReady() && colorSensors.readBottomSensor()) {
-          col = colorSensors.getBottomColor();
-          Serial.print("  Color at intersection: ");
-          Serial.println(colorSensors.getColorName(col));
-        } else {
-          Serial.println("  Bottom color sensor not ready!");
-        }
+        // ---------- DOWN direction (away from top corridor) ----------
+        if (!t1ReturningAlongLine) {
+          // Read bottom color sensor and show on OLED
+          DetectedColor col = COLOR_UNKNOWN;
 
-        // ---- Case A: GREEN detected -> BallCollector.cpp task ----
-        if (col == COLOR_GREEN) {
-          Serial.println("  GREEN detected -> go to COLLECTING");
-          stopAllMotors();
-          setSubState(T1_COLLECTING);
-          break;
-        }
+          if (colorSensors.isBottomReady() && colorSensors.readBottomSensor()) {
+            col = colorSensors.getBottomColor();
+            String colorName = colorSensors.getColorName(col);
+            Serial.print("  Color at intersection: ");
+            Serial.println(colorName);
 
-        // ---- Case B: No green - handle logic depending on direction ----
+            String lineInfo  = "Line " + String(t1CurrentLine + 1) +
+                               " Int " + String(t1IntersectionCount);
+            oledDisplay.show("Task1 Plantation",
+                             lineInfo,
+                             "Color: " + colorName);
+          } else {
+            Serial.println("  Bottom color sensor not ready!");
+          }
 
-        // Going DOWN along column (from top towards bottom)
-        if (!t1ReturningAlongColumn) {
-          // Last intersection (5th one) and still no green here:
-          // -> turn 180° and come back along same column
-          if (t1IntersectionCount == T1_NUM_INTERSECTIONS) {
-            Serial.println("  Reached bottom of column with no GREEN -> 180 deg turn and come back");
+          // If this is the 3rd intersection -> bottom of this line
+          if (t1IntersectionCount == T1_INTERSECTIONS_PER_LINE) {
+            Serial.println("  Reached bottom of line -> 180 deg turn and come back");
             stopAllMotors();
-            t1PendingTurn           = T1_TURN_180;
-            t1NextStateAfterTurn    = T1_LINE_FOLLOWING;   // continue but in reverse direction
-            t1ReturningAlongColumn  = true;                // now we are "coming back up"
-            t1IntersectionCount     = 0;                   // recount intersections on way back
+            t1PendingTurn        = T1_TURN_180;
+            t1NextStateAfterTurn = T1_LINE_FOLLOWING;   // continue but in reverse direction
+            t1ReturningAlongLine = true;                // now we are "coming back up"
+            t1IntersectionCount  = 0;                   // recount intersections on way back
             setSubState(T1_TURNING);
             break;
           }
-          // For intersections 1..4 with no green: just continue line follow
+          // For intersections 1..2 while going down: nothing special
         }
+        // ---------- UP direction (coming back to top) ----------
         else {
-          // We are coming back UP along the same column after 180°
-          // When we hit the 5th intersection again, we are back at the
-          // top intersection point (start of column).
-          if (t1IntersectionCount == T1_NUM_INTERSECTIONS) {
-            Serial.println("  Back at top of this column");
+          // When we hit the 3rd intersection again, we are back at top.
+          if (t1IntersectionCount == T1_INTERSECTIONS_PER_LINE) {
+            Serial.println("  Back at top of this line");
 
             stopAllMotors();
-            t1ReturningAlongColumn = false;
-            t1IntersectionCount    = 0;   // reset for next column / exit
+            t1ReturningAlongLine = false;
+            t1IntersectionCount  = 0;
 
-            if (t1ColumnIndex < T1_NUM_COLUMNS - 1) {
-              // Not the last column -> move to next column
-              t1ColumnIndex++;
-              Serial.print("  Moving to next column: ");
-              Serial.println(t1ColumnIndex);
+            // Prepare to either go to next line or exit
+            if (t1CurrentLine < T1_NUM_LINES - 1) {
+              // Not the last line -> move to next line
+              t1CurrentLine++;
+              Serial.print("  Moving to next line: ");
+              Serial.println(t1CurrentLine + 1);
 
-              t1PendingTurn        = T1_TURN_RIGHT_90;
-              t1NextStateAfterTurn = T1_LINE_FOLLOWING;
+              // We are still on this intersection; latch it so MOVE_TO_NEXT_LINE
+              // ignores it until the robot leaves it.
+              t1IntersectionLatched = true;
+
+              t1PendingTurn        = T1_TURN_RIGHT_90;       // first 90° right at top intersection
+              t1NextStateAfterTurn = T1_MOVE_TO_NEXT_LINE;   // then move along top corridor
             } else {
-              // Last column finished -> go to exit
-              Serial.println("  Finished last column -> Task COMPLETED (exit to right)");
+              // Last line finished -> go to exit
+              Serial.println("  Finished last line -> exit to right and forward 3000ms");
               t1PendingTurn        = T1_TURN_RIGHT_90;
-              t1NextStateAfterTurn = T1_COMPLETED;
+              t1NextStateAfterTurn = T1_EXIT_FORWARD;
             }
 
             setSubState(T1_TURNING);
@@ -319,7 +364,7 @@ void Task1Plantation::execute() {
         // just keep following the line.
       }
       else if (!intersectionNow && t1IntersectionLatched) {
-        // Left the intersection area -> arm the detection for the next one
+        // Left the intersection area -> arm detection for the next one
         t1IntersectionLatched = false;
       }
 
@@ -327,30 +372,79 @@ void Task1Plantation::execute() {
     }
 
     // -----------------------------------------------------------
-    // 6) COLLECTING: run BallCollector.cpp until it returns true
+    // 6) MOVE_TO_NEXT_LINE:
+    //    - after finishing a line and turning right at top intersection,
+    //      follow the top horizontal line until the next intersection,
+    //      then turn right 90° into the new vertical line and
+    //      go to T1_FOLLOWING (backup 1000 ms).
     // -----------------------------------------------------------
-    case T1_COLLECTING: {
-      Serial.println("Task 1: COLLECTING state (BallCollector)");
-      // Call ballCollector to collect the ball (assumes global ballCollector object)
-      if (ballCollector.collectingBall()) {
-        Serial.println("  BallCollector finished -> back to LINE_FOLLOWING");
-        // After collection, return to line following in current direction
-        setSubState(T1_LINE_FOLLOWING);
+    case T1_MOVE_TO_NEXT_LINE: {
+      // Follow the top corridor line
+      executeLineFollow();
+
+      readAllIRSensorsBinary();
+      int whiteCount = 0;
+      for (int i = 0; i < NUM_IR_SENSORS; i++) {
+        if (irBinary[i] == 1) whiteCount++;
+      }
+      bool intersectionNow = (whiteCount >= T1_INTERSECTION_WHITE_MIN);
+
+      if (intersectionNow && !t1IntersectionLatched) {
+        // New intersection -> this is the next vertical line
+        t1IntersectionLatched = true;
+
+        Serial.print("Task 1: Top corridor intersection for line ");
+        Serial.println(t1CurrentLine + 1);
+
+        stopAllMotors();
+        t1PendingTurn        = T1_TURN_RIGHT_90;  // turn into the new vertical line
+        t1NextStateAfterTurn = T1_FOLLOWING;      // then backup 1000 ms and start line following
+        setSubState(T1_TURNING);
+      }
+      else if (!intersectionNow && t1IntersectionLatched) {
+        // Left the previous intersection region
+        t1IntersectionLatched = false;
+      }
+
+      break;
+    }
+
+    // -----------------------------------------------------------
+    // 7) EXIT_FORWARD:
+    //    - after finishing line 4 and turning right at top intersection,
+    //      go forwards for 3000 ms and then complete the task.
+    // -----------------------------------------------------------
+    case T1_EXIT_FORWARD: {
+      unsigned long elapsed = millis() - subStateStartTime;
+
+      if (elapsed < T1_EXIT_FORWARD_TIME_MS) {
+        robotForward();
+      } else {
+        stopAllMotors();
+        Serial.println("Task 1: EXIT_FORWARD complete -> COMPLETED");
+        setSubState(T1_COMPLETED);
       }
       break;
     }
 
     // -----------------------------------------------------------
-    // 7) PLANTING: reserved for future (if you want separate planting action)
+    // 8) COLLECTING: reserved / not used in this version
+    // -----------------------------------------------------------
+    case T1_COLLECTING: {
+      // No collecting logic in this plantation version
+      break;
+    }
+
+    // -----------------------------------------------------------
+    // 9) PLANTING: reserved for future actions
     // -----------------------------------------------------------
     case T1_PLANTING: {
-      Serial.println("Task 1: PLANTING state");
       // Add planting logic here if needed
       break;
     }
 
     // -----------------------------------------------------------
-    // 8) COMPLETED: plantation task finished
+    // 10) COMPLETED: plantation task finished
     // -----------------------------------------------------------
     case T1_COMPLETED: {
       Serial.println("Task 1: COMPLETED");
@@ -381,7 +475,7 @@ void Task1Plantation::setSubState(Task1SubState newSubState) {
     currentSubState = newSubState;
     subStateStartTime = millis();
     
-    Serial.print("Task 1 sub-state: ");
+    Serial.print("Task 1 sub-state -> ");
     Serial.println(getSubStateName());
     updateDisplay();
   }
@@ -395,15 +489,17 @@ Task1SubState Task1Plantation::getSubState() {
 // Get sub-state name
 String Task1Plantation::getSubStateName() {
   switch(currentSubState) {
-    case T1_INIT:          return "INIT";
-    case T1_SEARCHING:     return "SEARCHING";
-    case T1_FOLLOWING:     return "FOLLOWING";
-    case T1_TURNING:       return "TURNING";
-    case T1_LINE_FOLLOWING:return "LINE_FOLLOWING";
-    case T1_COLLECTING:    return "COLLECTING";
-    case T1_PLANTING:      return "PLANTING";
-    case T1_COMPLETED:     return "COMPLETED";
-    default:               return "UNKNOWN";
+    case T1_INIT:            return "INIT";
+    case T1_SEARCHING:       return "SEARCHING";
+    case T1_FOLLOWING:       return "BACKUP_ON_LINE";
+    case T1_TURNING:         return "TURNING";
+    case T1_LINE_FOLLOWING:  return "LINE_FOLLOWING";
+    case T1_MOVE_TO_NEXT_LINE:return "MOVE_TO_NEXT_LINE";
+    case T1_EXIT_FORWARD:    return "EXIT_FORWARD";
+    case T1_COLLECTING:      return "COLLECTING";
+    case T1_PLANTING:        return "PLANTING";
+    case T1_COMPLETED:       return "COMPLETED";
+    default:                 return "UNKNOWN";
   }
 }
 
@@ -430,8 +526,6 @@ bool Task1Plantation::isActive() {
 bool Task1Plantation::isCompleted() {
   return (currentSubState == T1_COMPLETED);
 }
-
-
 
 // Reset task
 void Task1Plantation::reset() {
