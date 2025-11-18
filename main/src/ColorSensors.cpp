@@ -30,7 +30,7 @@ bool ColorSensors::begin() {
   // Initialize I2C Multiplexer
   mux->begin();
   
-  // Initialize bottom sensor (Channel 4)
+  // Initialize bottom sensor (Channel 5)
   mux->selectChannel(BOTTOM_COLOR_CHANNEL);
   delay(10);
   
@@ -41,15 +41,15 @@ bool ColorSensors::begin() {
   
   if (bottomSensor->begin()) {
     bottomInitialized = true;
-    Serial.println("  Bottom color sensor (Ch 4): OK");
+    Serial.println("  Bottom color sensor (Ch 5): OK");
   } else {
-    Serial.println("  Bottom color sensor (Ch 4): FAILED");
+    Serial.println("  Bottom color sensor (Ch 5): FAILED");
     bottomInitialized = false;
   }
   
   delay(50);
   
-  // Initialize top sensor (Channel 2)
+  // Initialize top sensor (Channel 1)
   mux->selectChannel(TOP_COLOR_CHANNEL);
   delay(10);
   
@@ -60,9 +60,9 @@ bool ColorSensors::begin() {
   
   if (topSensor->begin()) {
     topInitialized = true;
-    Serial.println("  Top color sensor (Ch 2): OK");
+    Serial.println("  Top color sensor (Ch 1): OK");
   } else {
-    Serial.println("  Top color sensor (Ch 2): FAILED");
+    Serial.println("  Top color sensor (Ch 1): FAILED");
     topInitialized = false;
   }
   
