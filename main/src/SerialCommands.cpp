@@ -35,39 +35,48 @@ void processSerialCommand(String command) {
   // Individual Motor Control
   else if (command == "LMF") {
     leftMotorForward();
+    Serial.println("Left Motor Forward");
     oledDisplay.show("Left Motor", "Forward");
   }
   else if (command == "LMB") {
     leftMotorBackward();
+    Serial.println("Left Motor Backward");
     oledDisplay.show("Left Motor", "Backward");
   }
   else if (command == "RMF") {
     rightMotorForward();
+    Serial.println("Right Motor Forward");
     oledDisplay.show("Right Motor", "Forward");
   }
   else if (command == "RMB") {
     rightMotorBackward();
+    Serial.println("Right Motor Backward");
     oledDisplay.show("Right Motor", "Backward");
   }
   // Robot Movement
   else if (command == "RF") {
     robotForward();
+    Serial.println("Robot Forward");
     oledDisplay.show("Robot", "Forward");
   }
   else if (command == "RB") {
     robotBackward();
+    Serial.println("Robot Backward");
     oledDisplay.show("Robot", "Backward");
   }
   else if (command == "RTL") {
     robotTurnLeft();
+    Serial.println("Robot Turn Left");
     oledDisplay.show("Robot", "Turn Left");
   }
   else if (command == "RTR") {
     robotTurnRight();
+    Serial.println("Robot Turn Right");
     oledDisplay.show("Robot", "Turn Right");
   }
   else if (command == "STOP") {
     stopAllMotors();
+    Serial.println("All Motors Stopped");
     // Stop all tasks
     task1Plantation.stop();
     task2WallFollow.stop();
@@ -81,6 +90,7 @@ void processSerialCommand(String command) {
     // Stop wall following
     if (wallFollow.isActive()) {
       wallFollow.stop();
+      Serial.println("Wall Following stopped");
     }
     oledDisplay.show("Robot", "STOPPED", "All Tasks");
   }
@@ -291,6 +301,150 @@ void processSerialCommand(String command) {
     task4Barcode.setIRWhiteThreshold(thresh);
     oledDisplay.show("T4 IR Thresh", String(thresh));
   }
+  // Task 1 Plantation Configuration
+  else if (command.startsWith("T1SEARCHSPD ")) {
+    uint16_t speed = command.substring(12).toInt();
+    task1Plantation.setSearchSpeed(speed);
+    oledDisplay.show("T1 Search Spd", String(speed));
+  }
+  else if (command.startsWith("T1FOLLOWSPD ")) {
+    uint16_t speed = command.substring(12).toInt();
+    task1Plantation.setFollowSpeed(speed);
+    oledDisplay.show("T1 Follow Spd", String(speed));
+  }
+  else if (command.startsWith("T1TURNSPD ")) {
+    uint16_t speed = command.substring(10).toInt();
+    task1Plantation.setTurnSpeed(speed);
+    oledDisplay.show("T1 Turn Spd", String(speed));
+  }
+  else if (command.startsWith("T1TURNDUR ")) {
+    unsigned long dur = command.substring(10).toInt();
+    task1Plantation.setTurnDuration(dur);
+    oledDisplay.show("T1 Turn Dur", String(dur) + " ms");
+  }
+  else if (command.startsWith("T1SEARCHDUR ")) {
+    unsigned long dur = command.substring(12).toInt();
+    task1Plantation.setSearchDuration(dur);
+    oledDisplay.show("T1 Search Dur", String(dur) + " ms");
+  }
+  else if (command.startsWith("T1COLLECTDUR ")) {
+    unsigned long dur = command.substring(13).toInt();
+    task1Plantation.setCollectDuration(dur);
+    oledDisplay.show("T1 Collect Dur", String(dur) + " ms");
+  }
+  else if (command.startsWith("T1BALLTHRESH ")) {
+    uint16_t thresh = command.substring(13).toInt();
+    task1Plantation.setBallDetectionThreshold(thresh);
+    oledDisplay.show("T1 Ball Thresh", String(thresh));
+  }
+  // Task 2 Wall Follow Configuration
+  else if (command.startsWith("T2APPSPD ")) {
+    uint16_t speed = command.substring(9).toInt();
+    task2WallFollow.setApproachSpeed(speed);
+    oledDisplay.show("T2 App Spd", String(speed));
+  }
+  else if (command.startsWith("T2FOLLOWSPD ")) {
+    uint16_t speed = command.substring(12).toInt();
+    task2WallFollow.setFollowSpeed(speed);
+    oledDisplay.show("T2 Follow Spd", String(speed));
+  }
+  else if (command.startsWith("T2TURNSPD ")) {
+    uint16_t speed = command.substring(10).toInt();
+    task2WallFollow.setTurnSpeed(speed);
+    oledDisplay.show("T2 Turn Spd", String(speed));
+  }
+  else if (command.startsWith("T2WALLDIST ")) {
+    uint16_t dist = command.substring(11).toInt();
+    task2WallFollow.setWallDetectionDistance(dist);
+    oledDisplay.show("T2 Wall Dist", String(dist) + " mm");
+  }
+  else if (command.startsWith("T2TARGETDIST ")) {
+    uint16_t dist = command.substring(13).toInt();
+    task2WallFollow.setTargetWallDistance(dist);
+    oledDisplay.show("T2 Target Dist", String(dist) + " mm");
+  }
+  else if (command.startsWith("T2TURNDUR ")) {
+    unsigned long dur = command.substring(10).toInt();
+    task2WallFollow.setTurnDuration(dur);
+    oledDisplay.show("T2 Turn Dur", String(dur) + " ms");
+  }
+  else if (command.startsWith("T2ALIGNDUR ")) {
+    unsigned long dur = command.substring(11).toInt();
+    task2WallFollow.setAlignDuration(dur);
+    oledDisplay.show("T2 Align Dur", String(dur) + " ms");
+  }
+  // Task 3 Ramp Configuration
+  else if (command.startsWith("T3APPSPD ")) {
+    uint16_t speed = command.substring(9).toInt();
+    task3Ramp.setApproachSpeed(speed);
+    oledDisplay.show("T3 App Spd", String(speed));
+  }
+  else if (command.startsWith("T3CLIMBSPD ")) {
+    uint16_t speed = command.substring(11).toInt();
+    task3Ramp.setClimbSpeed(speed);
+    oledDisplay.show("T3 Climb Spd", String(speed));
+  }
+  else if (command.startsWith("T3DESCSPD ")) {
+    uint16_t speed = command.substring(10).toInt();
+    task3Ramp.setDescendSpeed(speed);
+    oledDisplay.show("T3 Descend Spd", String(speed));
+  }
+  else if (command.startsWith("T3CLIMBDUR ")) {
+    unsigned long dur = command.substring(11).toInt();
+    task3Ramp.setClimbDuration(dur);
+    oledDisplay.show("T3 Climb Dur", String(dur) + " ms");
+  }
+  else if (command.startsWith("T3DESCDUR ")) {
+    unsigned long dur = command.substring(10).toInt();
+    task3Ramp.setDescendDuration(dur);
+    oledDisplay.show("T3 Descend Dur", String(dur) + " ms");
+  }
+  else if (command.startsWith("T3RAMPDIST ")) {
+    uint16_t dist = command.substring(11).toInt();
+    task3Ramp.setRampDetectionDistance(dist);
+    oledDisplay.show("T3 Ramp Dist", String(dist) + " mm");
+  }
+  else if (command.startsWith("T3TOPTHRESH ")) {
+    uint16_t thresh = command.substring(12).toInt();
+    task3Ramp.setTopDetectionThreshold(thresh);
+    oledDisplay.show("T3 Top Thresh", String(thresh) + " mm");
+  }
+  // Task 5 Unloading Configuration
+  else if (command.startsWith("T5NAVSPD ")) {
+    uint16_t speed = command.substring(9).toInt();
+    task5Unloading.setNavigateSpeed(speed);
+    oledDisplay.show("T5 Nav Spd", String(speed));
+  }
+  else if (command.startsWith("T5ALIGNSPD ")) {
+    uint16_t speed = command.substring(11).toInt();
+    task5Unloading.setAlignSpeed(speed);
+    oledDisplay.show("T5 Align Spd", String(speed));
+  }
+  else if (command.startsWith("T5UNLOADSPD ")) {
+    uint16_t speed = command.substring(12).toInt();
+    task5Unloading.setUnloadSpeed(speed);
+    oledDisplay.show("T5 Unload Spd", String(speed));
+  }
+  else if (command.startsWith("T5UNLOADDUR ")) {
+    unsigned long dur = command.substring(12).toInt();
+    task5Unloading.setUnloadDuration(dur);
+    oledDisplay.show("T5 Unload Dur", String(dur) + " ms");
+  }
+  else if (command.startsWith("T5ALIGNDUR ")) {
+    unsigned long dur = command.substring(11).toInt();
+    task5Unloading.setAlignDuration(dur);
+    oledDisplay.show("T5 Align Dur", String(dur) + " ms");
+  }
+  else if (command.startsWith("T5ZONEDIST ")) {
+    uint16_t dist = command.substring(11).toInt();
+    task5Unloading.setZoneDetectionDistance(dist);
+    oledDisplay.show("T5 Zone Dist", String(dist) + " mm");
+  }
+  else if (command.startsWith("T5BALLCOUNT ")) {
+    uint16_t count = command.substring(12).toInt();
+    task5Unloading.setTargetBallCount(count);
+    oledDisplay.show("T5 Ball Count", String(count));
+  }
   else if (command == "HELP" || command == "?") {
     printSerialCommands();
   }
@@ -350,6 +504,75 @@ void printSerialCommands() {
   Serial.println("  WFKD <value> - Set wall follow Kd gain (0.5)");
   Serial.println("  WFDIST <mm> - Set wall follow target distance (150)");
   Serial.println();
+  Serial.println("Task 1 Plantation Configuration:");
+  Serial.print("  T1SEARCHSPD <speed> - Search speed (");
+  Serial.print(task1Plantation.getSearchSpeed());
+  Serial.println(")");
+  Serial.print("  T1FOLLOWSPD <speed> - Follow speed (");
+  Serial.print(task1Plantation.getFollowSpeed());
+  Serial.println(")");
+  Serial.print("  T1TURNSPD <speed> - Turn speed (");
+  Serial.print(task1Plantation.getTurnSpeed());
+  Serial.println(")");
+  Serial.print("  T1TURNDUR <ms> - Turn duration for 90° (");
+  Serial.print(task1Plantation.getTurnDuration());
+  Serial.println(")");
+  Serial.print("  T1SEARCHDUR <ms> - Search duration (");
+  Serial.print(task1Plantation.getSearchDuration());
+  Serial.println(")");
+  Serial.print("  T1COLLECTDUR <ms> - Ball collection duration (");
+  Serial.print(task1Plantation.getCollectDuration());
+  Serial.println(")");
+  Serial.print("  T1BALLTHRESH <value> - Ball detection threshold (");
+  Serial.print(task1Plantation.getBallDetectionThreshold());
+  Serial.println(")");
+  Serial.println();
+  Serial.println("Task 2 Wall Follow Configuration:");
+  Serial.print("  T2APPSPD <speed> - Approach speed (");
+  Serial.print(task2WallFollow.getApproachSpeed());
+  Serial.println(")");
+  Serial.print("  T2FOLLOWSPD <speed> - Follow speed (");
+  Serial.print(task2WallFollow.getFollowSpeed());
+  Serial.println(")");
+  Serial.print("  T2TURNSPD <speed> - Turn speed (");
+  Serial.print(task2WallFollow.getTurnSpeed());
+  Serial.println(")");
+  Serial.print("  T2WALLDIST <mm> - Wall detection distance (");
+  Serial.print(task2WallFollow.getWallDetectionDistance());
+  Serial.println(")");
+  Serial.print("  T2TARGETDIST <mm> - Target wall distance (");
+  Serial.print(task2WallFollow.getTargetWallDistance());
+  Serial.println(")");
+  Serial.print("  T2TURNDUR <ms> - Turn duration for 90° (");
+  Serial.print(task2WallFollow.getTurnDuration());
+  Serial.println(")");
+  Serial.print("  T2ALIGNDUR <ms> - Alignment duration (");
+  Serial.print(task2WallFollow.getAlignDuration());
+  Serial.println(")");
+  Serial.println();
+  Serial.println("Task 3 Ramp Configuration:");
+  Serial.print("  T3APPSPD <speed> - Approach speed (");
+  Serial.print(task3Ramp.getApproachSpeed());
+  Serial.println(")");
+  Serial.print("  T3CLIMBSPD <speed> - Climb speed (");
+  Serial.print(task3Ramp.getClimbSpeed());
+  Serial.println(")");
+  Serial.print("  T3DESCSPD <speed> - Descend speed (");
+  Serial.print(task3Ramp.getDescendSpeed());
+  Serial.println(")");
+  Serial.print("  T3CLIMBDUR <ms> - Climb duration (");
+  Serial.print(task3Ramp.getClimbDuration());
+  Serial.println(")");
+  Serial.print("  T3DESCDUR <ms> - Descend duration (");
+  Serial.print(task3Ramp.getDescendDuration());
+  Serial.println(")");
+  Serial.print("  T3RAMPDIST <mm> - Ramp detection distance (");
+  Serial.print(task3Ramp.getRampDetectionDistance());
+  Serial.println(")");
+  Serial.print("  T3TOPTHRESH <mm> - Top detection threshold (");
+  Serial.print(task3Ramp.getTopDetectionThreshold());
+  Serial.println(")");
+  Serial.println();
   Serial.println("Task 4 Barcode Configuration:");
   Serial.print("  T4WALLDIST <mm> - Wall detection distance (");
   Serial.print(task4Barcode.getWallDetectionDistance());
@@ -380,6 +603,29 @@ void printSerialCommands() {
   Serial.println(")");
   Serial.print("  T4IRTHRESH <value> - IR threshold: >value=white(1) (");
   Serial.print(task4Barcode.getIRWhiteThreshold());
+  Serial.println(")");
+  Serial.println();
+  Serial.println("Task 5 Unloading Configuration:");
+  Serial.print("  T5NAVSPD <speed> - Navigate speed (");
+  Serial.print(task5Unloading.getNavigateSpeed());
+  Serial.println(")");
+  Serial.print("  T5ALIGNSPD <speed> - Align speed (");
+  Serial.print(task5Unloading.getAlignSpeed());
+  Serial.println(")");
+  Serial.print("  T5UNLOADSPD <speed> - Unload speed (");
+  Serial.print(task5Unloading.getUnloadSpeed());
+  Serial.println(")");
+  Serial.print("  T5UNLOADDUR <ms> - Unload duration (");
+  Serial.print(task5Unloading.getUnloadDuration());
+  Serial.println(")");
+  Serial.print("  T5ALIGNDUR <ms> - Alignment duration (");
+  Serial.print(task5Unloading.getAlignDuration());
+  Serial.println(")");
+  Serial.print("  T5ZONEDIST <mm> - Zone detection distance (");
+  Serial.print(task5Unloading.getZoneDetectionDistance());
+  Serial.println(")");
+  Serial.print("  T5BALLCOUNT <count> - Target ball count (");
+  Serial.print(task5Unloading.getTargetBallCount());
   Serial.println(")");
   Serial.println();
   Serial.println("State Machine:");

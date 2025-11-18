@@ -1,6 +1,13 @@
 /*********************************************************************
  * Task 5: Unloading Balls Implementation
  *********************************************************************/
+// SERIAL OUTPUT GUIDELINES:
+// - Print status ONCE when entering a new state (use static bool or state tracking)
+// - For time-based actions: print "Action for X ms" ONCE at start
+// - For condition-based actions: print "Action until condition" ONCE at start
+// - Avoid printing inside loops that run every cycle
+// - Low-level motor/sensor functions don't print - task prints context
+/**********************************************************************/
 
 #include "Task5_Unloading.h"
 #include "../Motors.h"
@@ -14,6 +21,15 @@ Task5Unloading::Task5Unloading() {
   subStateStartTime = 0;
   taskActive = false;
   ballsUnloaded = 0;
+  
+  // Default configuration (can be changed via serial commands)
+  navigateSpeed = 70;
+  alignSpeed = 50;
+  unloadSpeed = 40;
+  unloadDuration = 3000;  // 3 seconds to unload balls
+  alignDuration = 1500;  // 1.5 seconds alignment
+  zoneDetectionDistance = 150;  // mm
+  targetBallCount = 3;  // Expected number of balls
 }
 
 void Task5Unloading::init() {
@@ -128,4 +144,79 @@ void Task5Unloading::reset() {
 
 int Task5Unloading::getBallsUnloaded() {
   return ballsUnloaded;
+}
+
+// Configuration setters
+void Task5Unloading::setNavigateSpeed(uint16_t speed) {
+  navigateSpeed = speed;
+  Serial.print("T5 Navigate speed set to: ");
+  Serial.println(speed);
+}
+
+void Task5Unloading::setAlignSpeed(uint16_t speed) {
+  alignSpeed = speed;
+  Serial.print("T5 Align speed set to: ");
+  Serial.println(speed);
+}
+
+void Task5Unloading::setUnloadSpeed(uint16_t speed) {
+  unloadSpeed = speed;
+  Serial.print("T5 Unload speed set to: ");
+  Serial.println(speed);
+}
+
+void Task5Unloading::setUnloadDuration(unsigned long timeMs) {
+  unloadDuration = timeMs;
+  Serial.print("T5 Unload duration set to: ");
+  Serial.print(timeMs);
+  Serial.println(" ms");
+}
+
+void Task5Unloading::setAlignDuration(unsigned long timeMs) {
+  alignDuration = timeMs;
+  Serial.print("T5 Align duration set to: ");
+  Serial.print(timeMs);
+  Serial.println(" ms");
+}
+
+void Task5Unloading::setZoneDetectionDistance(uint16_t distance) {
+  zoneDetectionDistance = distance;
+  Serial.print("T5 Zone detection distance set to: ");
+  Serial.print(distance);
+  Serial.println(" mm");
+}
+
+void Task5Unloading::setTargetBallCount(uint16_t count) {
+  targetBallCount = count;
+  Serial.print("T5 Target ball count set to: ");
+  Serial.println(count);
+}
+
+// Configuration getters
+uint16_t Task5Unloading::getNavigateSpeed() {
+  return navigateSpeed;
+}
+
+uint16_t Task5Unloading::getAlignSpeed() {
+  return alignSpeed;
+}
+
+uint16_t Task5Unloading::getUnloadSpeed() {
+  return unloadSpeed;
+}
+
+unsigned long Task5Unloading::getUnloadDuration() {
+  return unloadDuration;
+}
+
+unsigned long Task5Unloading::getAlignDuration() {
+  return alignDuration;
+}
+
+uint16_t Task5Unloading::getZoneDetectionDistance() {
+  return zoneDetectionDistance;
+}
+
+uint16_t Task5Unloading::getTargetBallCount() {
+  return targetBallCount;
 }

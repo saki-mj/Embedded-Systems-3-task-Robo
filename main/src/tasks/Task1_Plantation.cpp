@@ -1,6 +1,13 @@
 /*********************************************************************
  * Task 1: Plantation Task Implementation
  *********************************************************************/
+// SERIAL OUTPUT GUIDELINES:
+// - Print status ONCE when entering a new state (use static bool or state tracking)
+// - For time-based actions: print "Action for X ms" ONCE at start
+// - For condition-based actions: print "Action until condition" ONCE at start
+// - Avoid printing inside loops that run every cycle
+// - Low-level motor/sensor functions don't print - task prints context
+/**********************************************************************/
 
 #include "Task1_Plantation.h"
 #include "BallCollector.h"
@@ -18,6 +25,15 @@ Task1Plantation::Task1Plantation() {
   currentSubState = T1_INIT;
   subStateStartTime = 0;
   taskActive = false;
+  
+  // Default configuration (can be changed via serial commands)
+  searchSpeed = 60;
+  followSpeed = 70;
+  turnSpeed = 55;
+  turnDuration = 1000;  // 1 second for 90° turn
+  searchDuration = 5000;  // 5 seconds search time
+  collectDuration = 2000;  // 2 seconds collection time
+  ballDetectionThreshold = 100;  // Default threshold
 }
 
 // Initialize task
@@ -172,4 +188,79 @@ void Task1Plantation::reset() {
 
     
   
+}
+
+// Configuration setters
+void Task1Plantation::setSearchSpeed(uint16_t speed) {
+  searchSpeed = speed;
+  Serial.print("T1 Search speed set to: ");
+  Serial.println(speed);
+}
+
+void Task1Plantation::setFollowSpeed(uint16_t speed) {
+  followSpeed = speed;
+  Serial.print("T1 Follow speed set to: ");
+  Serial.println(speed);
+}
+
+void Task1Plantation::setTurnSpeed(uint16_t speed) {
+  turnSpeed = speed;
+  Serial.print("T1 Turn speed set to: ");
+  Serial.println(speed);
+}
+
+void Task1Plantation::setTurnDuration(unsigned long timeMs) {
+  turnDuration = timeMs;
+  Serial.print("T1 Turn duration set to: ");
+  Serial.print(timeMs);
+  Serial.println(" ms");
+}
+
+void Task1Plantation::setSearchDuration(unsigned long timeMs) {
+  searchDuration = timeMs;
+  Serial.print("T1 Search duration set to: ");
+  Serial.print(timeMs);
+  Serial.println(" ms");
+}
+
+void Task1Plantation::setCollectDuration(unsigned long timeMs) {
+  collectDuration = timeMs;
+  Serial.print("T1 Collect duration set to: ");
+  Serial.print(timeMs);
+  Serial.println(" ms");
+}
+
+void Task1Plantation::setBallDetectionThreshold(uint16_t threshold) {
+  ballDetectionThreshold = threshold;
+  Serial.print("T1 Ball detection threshold set to: ");
+  Serial.println(threshold);
+}
+
+// Configuration getters
+uint16_t Task1Plantation::getSearchSpeed() {
+  return searchSpeed;
+}
+
+uint16_t Task1Plantation::getFollowSpeed() {
+  return followSpeed;
+}
+
+uint16_t Task1Plantation::getTurnSpeed() {
+  return turnSpeed;
+}
+
+unsigned long Task1Plantation::getTurnDuration() {
+  return turnDuration;
+}
+
+unsigned long Task1Plantation::getSearchDuration() {
+  return searchDuration;
+}
+
+unsigned long Task1Plantation::getCollectDuration() {
+  return collectDuration;
+}
+
+uint16_t Task1Plantation::getBallDetectionThreshold() {
+  return ballDetectionThreshold;
 }
