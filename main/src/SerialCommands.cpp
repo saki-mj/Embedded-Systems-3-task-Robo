@@ -445,6 +445,44 @@ void processSerialCommand(String command) {
     task5Unloading.setTargetBallCount(count);
     oledDisplay.show("T5 Ball Count", String(count));
   }
+
+  // Task1 Plantation tunable parameters (via serial)
+  else if (command.startsWith("T1TURN90 ")) {
+    unsigned long dur = command.substring(9).toInt();
+    T1_TURN_90_TIME_MS = dur;
+    oledDisplay.show("T1 Turn90", String(dur) + " ms");
+  }
+  else if (command.startsWith("T1TURN180 ")) {
+    unsigned long dur = command.substring(10).toInt();
+    T1_TURN_180_TIME_MS = dur;
+    oledDisplay.show("T1 Turn180", String(dur) + " ms");
+  }
+  else if (command.startsWith("T1BACKUP ")) {
+    unsigned long dur = command.substring(8).toInt();
+    T1_BACKUP_TIME_MS = dur;
+    oledDisplay.show("T1 Backup", String(dur) + " ms");
+  }
+  else if (command.startsWith("T1EXIT ")) {
+    unsigned long dur = command.substring(6).toInt();
+    T1_EXIT_FORWARD_TIME_MS = dur;
+    oledDisplay.show("T1 Exit", String(dur) + " ms");
+  }
+  else if (command.startsWith("T1SPEED ")) {
+    int lvl = command.substring(7).toInt();
+    if (lvl >= 1 && lvl <= 12) {
+      T1_SPEED_LEVEL = lvl;
+      setSpeedLevel(T1_SPEED_LEVEL);
+      oledDisplay.show("T1 Speed", String(T1_SPEED_LEVEL));
+    } else {
+      Serial.println("Invalid T1 speed level. Use 1-12.");
+    }
+  }
+  else if (command.startsWith("T1ITHRESH ")) {
+    int v = command.substring(9).toInt();
+    T1_INTERSECTION_WHITE_MIN = v;
+    oledDisplay.show("T1 IR Thresh", String(v));
+  }
+
   else if (command == "HELP" || command == "?") {
     printSerialCommands();
   }
@@ -627,6 +665,13 @@ void printSerialCommands() {
   Serial.print("  T5BALLCOUNT <count> - Target ball count (");
   Serial.print(task5Unloading.getTargetBallCount());
   Serial.println(")");
+  Serial.println("Task 1 Plantation Configuration:");
+  Serial.print("  T1TURN90 <ms> - 90° turn duration (current: "); Serial.print(T1_TURN_90_TIME_MS); Serial.println(" ms)");
+  Serial.print("  T1TURN180 <ms> - 180° turn duration (current: "); Serial.print(T1_TURN_180_TIME_MS); Serial.println(" ms)");
+  Serial.print("  T1BACKUP <ms> - Backup duration after turn (current: "); Serial.print(T1_BACKUP_TIME_MS); Serial.println(" ms)");
+  Serial.print("  T1EXIT <ms> - Exit forward duration after last line (current: "); Serial.print(T1_EXIT_FORWARD_TIME_MS); Serial.println(" ms)");
+  Serial.print("  T1SPEED <1-12> - Task1 default speed level (current: "); Serial.print(T1_SPEED_LEVEL); Serial.println(")");
+  Serial.print("  T1ITHRESH <value> - IR white count threshold for intersections (current: "); Serial.print(T1_INTERSECTION_WHITE_MIN); Serial.println(")");
   Serial.println();
   Serial.println("State Machine:");
   Serial.println("  START - Enter IDLE state (ready to run)");
