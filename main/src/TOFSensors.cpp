@@ -44,9 +44,9 @@ bool TOFSensors::begin() {
   }
   Serial.println("Left TOF initialized successfully");
   
-  // Initialize Front TOF on Channel 1
-  Serial.println("Initializing Front TOF (Channel 1)...");
-  mux->selectChannel(MUX_CHANNEL_1);
+  // Initialize Front TOF on Channel 4
+  Serial.println("Initializing Front TOF (Channel 4)...");
+  mux->selectChannel(MUX_CHANNEL_4);
   delay(50);
   if (!loxFront->begin()) {
     Serial.println("ERROR: Failed to initialize Front TOF!");
@@ -84,7 +84,7 @@ void TOFSensors::readAll() {
   }
   
   // Read Front TOF
-  mux->selectChannel(MUX_CHANNEL_1);
+  mux->selectChannel(MUX_CHANNEL_4);
   loxFront->rangingTest(&measure, false);
   if (measure.RangeStatus != 4) {
     distanceFront = measure.RangeMilliMeter;

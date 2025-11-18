@@ -27,6 +27,15 @@ class Task1Plantation {
     Task1SubState currentSubState;
     unsigned long subStateStartTime;
     bool taskActive;
+    
+    // Configuration parameters (can be changed via serial commands)
+    uint16_t searchSpeed;
+    uint16_t followSpeed;
+    uint16_t turnSpeed;
+    unsigned long turnDuration;
+    unsigned long searchDuration;
+    unsigned long collectDuration;
+    uint16_t ballDetectionThreshold;  // TOF or color sensor threshold
 
   public:
     // Constructor
@@ -54,6 +63,24 @@ class Task1Plantation {
     
     // Reset task
     void reset();
+    
+    // Configuration setters
+    void setSearchSpeed(uint16_t speed);
+    void setFollowSpeed(uint16_t speed);
+    void setTurnSpeed(uint16_t speed);
+    void setTurnDuration(unsigned long timeMs);
+    void setSearchDuration(unsigned long timeMs);
+    void setCollectDuration(unsigned long timeMs);
+    void setBallDetectionThreshold(uint16_t threshold);
+    
+    // Configuration getters
+    uint16_t getSearchSpeed();
+    uint16_t getFollowSpeed();
+    uint16_t getTurnSpeed();
+    unsigned long getTurnDuration();
+    unsigned long getSearchDuration();
+    unsigned long getCollectDuration();
+    uint16_t getBallDetectionThreshold();
 
 // Timing setters (for Serial tuning)
 void T1_setTurn90Time(unsigned long ms);

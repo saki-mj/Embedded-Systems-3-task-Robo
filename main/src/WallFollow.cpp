@@ -1,6 +1,10 @@
 /*********************************************************************
  * Wall Following Library Implementation
  *********************************************************************/
+// DESIGN PRINCIPLE: Control functions (start/stop/execute) DO NOT print
+// repetitive serial output. Tasks using wall following should print
+// meaningful context-specific status messages at state transitions.
+/**********************************************************************/
 
 #include "WallFollow.h"
 #include "Motors.h"
@@ -32,28 +36,36 @@ void WallFollow::init() {
 }
 
 void WallFollow::setKp(float newKp) {
-  kp = newKp;
-  Serial.print("Wall Follow Kp set to: ");
-  Serial.println(kp, 3);
+  if (kp != newKp) {
+    kp = newKp;
+    Serial.print("Wall Follow Kp set to: ");
+    Serial.println(kp, 3);
+  }
 }
 
 void WallFollow::setKd(float newKd) {
-  kd = newKd;
-  Serial.print("Wall Follow Kd set to: ");
-  Serial.println(kd, 3);
+  if (kd != newKd) {
+    kd = newKd;
+    Serial.print("Wall Follow Kd set to: ");
+    Serial.println(kd, 3);
+  }
 }
 
 void WallFollow::setTargetDistance(uint16_t distance) {
-  targetDistance = distance;
-  Serial.print("Wall Follow target distance set to: ");
-  Serial.print(targetDistance);
-  Serial.println(" mm");
+  if (targetDistance != distance) {
+    targetDistance = distance;
+    Serial.print("Wall Follow target distance set to: ");
+    Serial.print(targetDistance);
+    Serial.println(" mm");
+  }
 }
 
 void WallFollow::setBaseSpeed(uint16_t speed) {
-  baseSpeed = speed;
-  Serial.print("Wall Follow base speed set to: ");
-  Serial.println(baseSpeed);
+  if (baseSpeed != speed) {
+    baseSpeed = speed;
+    Serial.print("Wall Follow base speed set to: ");
+    Serial.println(baseSpeed);
+  }
 }
 
 void WallFollow::setMaxCorrection(int correction) {
@@ -133,13 +145,15 @@ void WallFollow::start() {
   active = true;
   lastError = 0;
   lastUpdateTime = millis();
-  Serial.println("Wall Following started");
+  // NOTE: Serial output removed to prevent spam in task loops
+  // Tasks print their own status when starting wall following
 }
 
 void WallFollow::stop() {
   active = false;
   stopAllMotors();
-  Serial.println("Wall Following stopped");
+  // NOTE: Serial output removed to prevent spam when called in task state transitions
+  // Tasks should print their own contextual status messages when stopping wall follow
 }
 
 bool WallFollow::isActive() {
