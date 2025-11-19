@@ -17,6 +17,7 @@
 #include "tasks/Task3_Ramp.h"
 #include "tasks/Task4_Barcode.h"
 #include "tasks/Task5_Unloading.h"
+#include "tasks/BallCollector.h"
 
 void processSerialCommand(String command) {
   command.trim();
@@ -82,6 +83,20 @@ void processSerialCommand(String command) {
     if (wallFollow.isActive()) {
       wallFollow.stop();
     }
+    // Stop IR reading modes
+    if (isIRReadingActive()) {
+      toggleIRReading();
+    }
+    if (isIRReadingBinaryActive()) {
+      toggleIRReadingBinary();
+    }
+    // Stop TOF continuous reading
+    if (tofSensors.isContinuousReadingActive()) {
+      tofSensors.toggleContinuousReading();
+    }
+    // Stop all color sensor continuous reading
+    colorSensors.stopAllContinuousReading();
+    
     oledDisplay.show("Robot", "STOPPED", "All Tasks");
   }
   // IR Sensor Reading
@@ -138,22 +153,34 @@ void processSerialCommand(String command) {
     printColorValues();
   }
   else if (command == "COLORBOTTOM") {
-    colorSensors.readBottomSensor();
-    ColorData data = colorSensors.getBottomColorData();
-    Serial.print("Bottom: R="); Serial.print(data.r);
-    Serial.print(" G="); Serial.print(data.g);
-    Serial.print(" B="); Serial.print(data.b);
-    Serial.print(" Color="); Serial.println(colorSensors.getColorName(colorSensors.getBottomColor()));
-    oledDisplay.show("Bottom Color", colorSensors.getColorName(colorSensors.getBottomColor()));
+    colorSensors.toggleBottomContinuousReading();
+    if (!colorSensors.isBottomContinuousReading()) {
+      oledDisplay.show("Bottom Color", "Stopped");
+    } else {
+      oledDisplay.show("Bottom Color", "Continuous ON");
+    }
   }
   else if (command == "COLORTOP") {
-    colorSensors.readTopSensor();
-    ColorData data = colorSensors.getTopColorData();
-    Serial.print("Top: R="); Serial.print(data.r);
-    Serial.print(" G="); Serial.print(data.g);
-    Serial.print(" B="); Serial.print(data.b);
-    Serial.print(" Color="); Serial.println(colorSensors.getColorName(colorSensors.getTopColor()));
-    oledDisplay.show("Top Color", colorSensors.getColorName(colorSensors.getTopColor()));
+    colorSensors.toggleTopContinuousReading();
+    if (!colorSensors.isTopContinuousReading()) {
+      oledDisplay.show("Top Color", "Stopped");
+    } else {
+      oledDisplay.show("Top Color", "Continuous ON");
+    }
+  }
+  else if (command == "COLORBACK") {
+    colorSensors.toggleBackContinuousReading();
+    if (!colorSensors.isBackContinuousReading()) {
+      oledDisplay.show("Back Color", "Stopped");
+    } else {
+      oledDisplay.show("Back Color", "Continuous ON");
+    }
+  }
+  else if (command == "COLORSCAN") {
+    Serial.println("Scanning all I2C mux channels for color sensors...");
+    oledDisplay.show("Scanning", "Color Sensors");
+    scanColorSensors();
+    oledDisplay.show("Scan Complete", "Check Serial");
   }
   // Push Button
   else if (command == "BUTTONREAD") {
@@ -291,6 +318,128 @@ void processSerialCommand(String command) {
     task4Barcode.setIRWhiteThreshold(thresh);
     oledDisplay.show("T4 IR Thresh", String(thresh));
   }
+  // Ball Collector Commands
+  else if (command == "BALLCOLLECT") {
+    Serial.println("Starting ball collection sequence...");
+    oledDisplay.show("Ball Collect", "Starting...");
+    ballCollector.collectingBall();
+  }
+  else if (command.startsWith("BCARMPOS ")) {
+    // Format: BCARMPOS pos0 pos1
+    int spaceIndex = command.indexOf(' ', 9);
+    if (spaceIndex > 0) {
+      int pos0 = command.substring(9, spaceIndex).toInt();
+      int pos1 = command.substring(spaceIndex + 1).toInt();
+      ballCollector.setArmPositions(pos0, pos1);
+      Serial.print("Arm positions updated - Home: ");
+      Serial.print(pos0);
+      Serial.print("°, Pickup: ");
+      Serial.print(pos1);
+      Serial.println("°");
+      oledDisplay.show("Arm Pos", String(pos0) + "," + String(pos1));
+    } else {
+      Serial.print("Current - Home: ");
+      Serial.print(ballCollector.getArmPos0());
+      Serial.print("°, Pickup: ");
+      Serial.print(ballCollector.getArmPos1());
+      Serial.println("°");
+      Serial.println("Usage: BCARMPOS <pos0> <pos1>");
+    }
+  }
+  else if (command.startsWith("BCGRIPPOS ")) {
+    // Format: BCGRIPPOS pos0 pos1
+    int spaceIndex = command.indexOf(' ', 10);
+    if (spaceIndex > 0) {
+      int pos0 = command.substring(10, spaceIndex).toInt();
+      int pos1 = command.substring(spaceIndex + 1).toInt();
+      ballCollector.setGripperPositions(pos0, pos1);
+      Serial.print("Gripper positions updated - Open: ");
+      Serial.print(pos0);
+      Serial.print("°, Closed: ");
+      Serial.print(pos1);
+      Serial.println("°");
+      oledDisplay.show("Grip Pos", String(pos0) + "," + String(pos1));
+    } else {
+      Serial.print("Current - Open: ");
+      Serial.print(ballCollector.getGripperPos0());
+      Serial.print("°, Closed: ");
+      Serial.print(ballCollector.getGripperPos1());
+      Serial.println("°");
+      Serial.println("Usage: BCGRIPPOS <pos0> <pos1>");
+    }
+  }
+  else if (command.startsWith("BCSORTPOS ")) {
+    // Format: BCSORTPOS pos0 pos1 pos2
+    int space1 = command.indexOf(' ', 10);
+    int space2 = command.indexOf(' ', space1 + 1);
+    if (space1 > 0 && space2 > 0) {
+      int pos0 = command.substring(10, space1).toInt();
+      int pos1 = command.substring(space1 + 1, space2).toInt();
+      int pos2 = command.substring(space2 + 1).toInt();
+      ballCollector.setSortingPositions(pos0, pos1, pos2);
+      Serial.print("Sorting positions updated - Yellow: ");
+      Serial.print(pos0);
+      Serial.print("°, Home: ");
+      Serial.print(pos1);
+      Serial.print("°, White: ");
+      Serial.print(pos2);
+      Serial.println("°");
+      oledDisplay.show("Sort Pos", String(pos0) + "," + String(pos1) + "," + String(pos2));
+    } else {
+      Serial.print("Current - Yellow: ");
+      Serial.print(ballCollector.getSortingPos0());
+      Serial.print("°, Home: ");
+      Serial.print(ballCollector.getSortingPos1());
+      Serial.print("°, White: ");
+      Serial.print(ballCollector.getSortingPos2());
+      Serial.println("°");
+      Serial.println("Usage: BCSORTPOS <pos0> <pos1> <pos2>");
+    }
+  }
+  else if (command.startsWith("CONFIGARM ")) {
+    int angle = command.substring(10).toInt();
+    ballCollector.testServo("ARM", angle);
+  }
+  else if (command.startsWith("CONFIGGRIP ")) {
+    int angle = command.substring(11).toInt();
+    ballCollector.testServo("GRIPPER", angle);
+  }
+  else if (command.startsWith("CONFIGSORT ")) {
+    int angle = command.substring(11).toInt();
+    ballCollector.testServo("SORTING", angle);
+  }
+  else if (command.startsWith("BCSERVODELAY ")) {
+    unsigned long delay = command.substring(13).toInt();
+    ballCollector.setServoMoveDelay(delay);
+    Serial.print("Servo move delay set to ");
+    Serial.print(delay);
+    Serial.println(" ms");
+    oledDisplay.show("Servo Delay", String(delay) + " ms");
+  }
+  else if (command.startsWith("BCCOLORDELAY ")) {
+    unsigned long delay = command.substring(13).toInt();
+    ballCollector.setColorDetectDelay(delay);
+    Serial.print("Color detection delay set to ");
+    Serial.print(delay);
+    Serial.println(" ms");
+    oledDisplay.show("Color Delay", String(delay) + " ms");
+  }
+  else if (command.startsWith("BCSORTDELAY ")) {
+    unsigned long delay = command.substring(12).toInt();
+    ballCollector.setSortingDelay(delay);
+    Serial.print("Sorting delay set to ");
+    Serial.print(delay);
+    Serial.println(" ms");
+    oledDisplay.show("Sort Delay", String(delay) + " ms");
+  }
+  else if (command.startsWith("BCDONEDELAY ")) {
+    unsigned long delay = command.substring(12).toInt();
+    ballCollector.setCompletionDelay(delay);
+    Serial.print("Completion delay set to ");
+    Serial.print(delay);
+    Serial.println(" ms");
+    oledDisplay.show("Done Delay", String(delay) + " ms");
+  }
   else if (command == "HELP" || command == "?") {
     printSerialCommands();
   }
@@ -335,9 +484,11 @@ void printSerialCommands() {
   Serial.println("  TOFTHRESHOLD <mm> - Set obstacle threshold");
   Serial.println();
   Serial.println("Color Sensors:");
-  Serial.println("  COLORREAD - Read both color sensors");
-  Serial.println("  COLORBOTTOM - Read bottom color sensor (Ch 4)");
-  Serial.println("  COLORTOP - Read top color sensor (Ch 2)");
+  Serial.println("  COLORREAD - Read all color sensors (one time)");
+  Serial.println("  COLORSCAN - Scan all channels to find color sensors");
+  Serial.println("  COLORBOTTOM - Toggle continuous bottom sensor (Ch 5)");
+  Serial.println("  COLORTOP - Toggle continuous top sensor (Ch 2 - Ball Detection)");
+  Serial.println("  COLORBACK - Toggle continuous back sensor (Ch 1)");
   Serial.println();
   Serial.println("Push Button:");
   Serial.println("  BUTTONREAD - Read current button state");
@@ -381,6 +532,47 @@ void printSerialCommands() {
   Serial.print("  T4IRTHRESH <value> - IR threshold: >value=white(1) (");
   Serial.print(task4Barcode.getIRWhiteThreshold());
   Serial.println(")");
+  Serial.println();
+  Serial.println("Ball Collector:");
+  Serial.println("  BALLCOLLECT - Execute ball collection sequence");
+  Serial.println();
+  Serial.println("  Servo Position Configuration:");
+  Serial.print("    BCARMPOS <pos0> <pos1> - Set arm positions (Current: ");
+  Serial.print(ballCollector.getArmPos0());
+  Serial.print("°, ");
+  Serial.print(ballCollector.getArmPos1());
+  Serial.println("°)");
+  Serial.print("    BCGRIPPOS <pos0> <pos1> - Set gripper positions (Current: ");
+  Serial.print(ballCollector.getGripperPos0());
+  Serial.print("°, ");
+  Serial.print(ballCollector.getGripperPos1());
+  Serial.println("°)");
+  Serial.print("    BCSORTPOS <pos0> <pos1> <pos2> - Set sorting positions (Current: ");
+  Serial.print(ballCollector.getSortingPos0());
+  Serial.print("°, ");
+  Serial.print(ballCollector.getSortingPos1());
+  Serial.print("°, ");
+  Serial.print(ballCollector.getSortingPos2());
+  Serial.println("°)");
+  Serial.println();
+  Serial.println("  Individual Servo Testing (0-180°):");
+  Serial.println("    CONFIGARM <angle> - Test arm servo at specific angle");
+  Serial.println("    CONFIGGRIP <angle> - Test gripper servo at specific angle");
+  Serial.println("    CONFIGSORT <angle> - Test sorting servo at specific angle");
+  Serial.println();
+  Serial.println("  Timing Configuration (milliseconds):");
+  Serial.print("    BCSERVODELAY <ms> - Servo movement delay (Current: ");
+  Serial.print(ballCollector.getServoMoveDelay());
+  Serial.println(" ms)");
+  Serial.print("    BCCOLORDELAY <ms> - Color detection delay (Current: ");
+  Serial.print(ballCollector.getColorDetectDelay());
+  Serial.println(" ms)");
+  Serial.print("    BCSORTDELAY <ms> - Sorting position delay (Current: ");
+  Serial.print(ballCollector.getSortingDelay());
+  Serial.println(" ms)");
+  Serial.print("    BCDONEDELAY <ms> - Completion delay before DONE (Current: ");
+  Serial.print(ballCollector.getCompletionDelay());
+  Serial.println(" ms)");
   Serial.println();
   Serial.println("State Machine:");
   Serial.println("  START - Enter IDLE state (ready to run)");
