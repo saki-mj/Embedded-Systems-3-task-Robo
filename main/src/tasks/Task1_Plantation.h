@@ -10,16 +10,17 @@
 
 // Task 1 Sub-states
 enum Task1SubState {
-  T1_INIT,            // Reset and start
-  T1_SEARCHING,       // Move forward until first main line is found
-  T1_FOLLOWING,       // Generic "backup on line" (1000 ms)
-  T1_TURNING,         // Timed 90° / 180° turns
-  T1_LINE_FOLLOWING,  // Follow current vertical line (down and up)
+  T1_INIT,              // Reset and start
+  T1_SEARCHING,         // Move forward until first main line is found
+  T1_BACKUP_AFTER_TURN, // Backup on a vertical line after a 90° turn
+  T1_FOLLOWING,         // (legacy name, not used directly in execute)
+  T1_TURNING,           // Timed 90° / 180° turns
+  T1_LINE_FOLLOWING,    // Follow current vertical line (down and up)
   T1_MOVE_TO_NEXT_LINE, // Move horizontally on top corridor to next line
-  T1_EXIT_FORWARD,    // Final 3000 ms forward after last line
-  T1_COLLECTING,      // (Reserved / unused here)
-  T1_PLANTING,        // (Reserved / unused here)
-  T1_COMPLETED        // Task finished
+  T1_EXIT_FORWARD,      // Final 3000 ms forward after last line
+  T1_COLLECTING,        // (Reserved / unused here)
+  T1_PLANTING,          // (Reserved / unused here)
+  T1_COMPLETED          // Task finished
 };
 
 class Task1Plantation {
@@ -32,9 +33,11 @@ class Task1Plantation {
     uint16_t searchSpeed;
     uint16_t followSpeed;
     uint16_t turnSpeed;
+
     float searchSpeedMultiplier;  // Relative to base speed (1.0 = same as base)
     float followSpeedMultiplier;  // Relative to base speed (1.0 = same as base)
     float turnSpeedMultiplier;    // Relative to base speed (0.8 = 80% of base)
+
     unsigned long turnDuration;
     unsigned long searchDuration;
     unsigned long collectDuration;
@@ -71,9 +74,11 @@ class Task1Plantation {
     void setSearchSpeed(uint16_t speed);
     void setFollowSpeed(uint16_t speed);
     void setTurnSpeed(uint16_t speed);
+
     void setSearchSpeedMultiplier(float mult);
     void setFollowSpeedMultiplier(float mult);
     void setTurnSpeedMultiplier(float mult);
+
     void setTurnDuration(unsigned long timeMs);
     void setSearchDuration(unsigned long timeMs);
     void setCollectDuration(unsigned long timeMs);
@@ -83,21 +88,15 @@ class Task1Plantation {
     uint16_t getSearchSpeed();
     uint16_t getFollowSpeed();
     uint16_t getTurnSpeed();
+
     float getSearchSpeedMultiplier();
     float getFollowSpeedMultiplier();
     float getTurnSpeedMultiplier();
+
     unsigned long getTurnDuration();
     unsigned long getSearchDuration();
     unsigned long getCollectDuration();
     uint16_t getBallDetectionThreshold();
-
-// Timing setters (for Serial tuning)
-void T1_setTurn90Time(unsigned long ms);
-void T1_setTurn180Time(unsigned long ms);
-void T1_setBackupTime(unsigned long ms);
-void T1_setExitForwardTime(unsigned long ms);
-void T1_setIntersectionWhiteMin(int min);
-
 };
 
 // Global task object
@@ -110,5 +109,16 @@ extern unsigned long T1_BACKUP_TIME_MS;
 extern unsigned long T1_EXIT_FORWARD_TIME_MS;
 extern int T1_INTERSECTION_WHITE_MIN;      // how many white sensors = "intersection"
 
+// NEW: Task1 default speed level (1–12), used by SerialCommands.cpp
+extern uint8_t T1_SPEED_LEVEL;   // Task1 default speed level (1–12)
+
+// Timing setters (for Serial tuning) – free functions
+void T1_setTurn90Time(unsigned long ms);
+void T1_setTurn180Time(unsigned long ms);
+void T1_setBackupTime(unsigned long ms);
+void T1_setExitForwardTime(unsigned long ms);
+void T1_setIntersectionWhiteMin(int min);
+
 #endif
+
 
