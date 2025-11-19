@@ -40,19 +40,21 @@ enum T1TurnCommand {
   T1_TURN_180
 };
 
-// Tunable timings (milliseconds)  --- you can change / tune these ---
-unsigned long T1_TURN_90_TIME_MS      = 2000;   // 90° turn
-unsigned long T1_TURN_180_TIME_MS     = 3500;  // 180° turn
-unsigned long T1_BACKUP_TIME_MS       = 1500;  // backup after aligning with a line
-unsigned long T1_EXIT_FORWARD_TIME_MS = 3000;  // final straight exit
+// Tunable timings (milliseconds) - Global definitions for Task1
+// These match the extern declarations in Task1_Plantation.h
+unsigned long T1_TURN_90_TIME_MS      = 2000;   // 90° turn time
+unsigned long T1_TURN_180_TIME_MS     = 3500;   // 180° turn time
+unsigned long T1_BACKUP_TIME_MS       = 1500;   // backup after aligning with a line
+unsigned long T1_EXIT_FORWARD_TIME_MS = 3000;   // final straight exit time
 
 // Task1 runtime-configurable defaults
-int T1_SPEED_LEVEL = 6;                     // default speed level used by Task1
+int T1_SPEED_LEVEL = 6;                          // default speed level (1-12)
+int T1_INTERSECTION_WHITE_MIN = 7;               // minimum white sensors to detect intersection
 
 // Plantation grid settings
 const int T1_INTERSECTIONS_PER_LINE   = 3;   // 3 intersections in each vertical line
 const int T1_NUM_LINES                = 4;   // 4 vertical lines total
-int T1_INTERSECTION_WHITE_MIN   = 7;         // how many white sensors = "intersection" (runtime configurable)
+// T1_INTERSECTION_WHITE_MIN is defined above with other tunable parameters
 
 // State for current plantation sweep
 static T1TurnCommand  t1PendingTurn        = T1_TURN_NONE;

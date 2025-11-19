@@ -75,7 +75,6 @@ bool ColorSensors::begin() {
   
   // Initialize top sensor (Channel 2)
   Serial.print("Selecting Channel "); Serial.print(TOP_COLOR_CHANNEL); Serial.println(" for Top sensor...");
-  // Initialize top sensor (Channel 1)
   mux->selectChannel(TOP_COLOR_CHANNEL);
   delay(100);
   
@@ -125,10 +124,6 @@ bool ColorSensors::begin() {
       Serial.println("  Back color sensor (Ch 1): FAILED after retry");
       backInitialized = false;
     }
-    Serial.println("  Top color sensor (Ch 1): OK");
-  } else {
-    Serial.println("  Top color sensor (Ch 1): FAILED");
-    topInitialized = false;
   }
   
   mux->disableAll();
@@ -265,7 +260,38 @@ DetectedColor ColorSensors::getBottomColor() {
 }
 
 DetectedColor ColorSensors::getTopColor() {
-  return classifyColor(topData.r, topData.g, topData.b, topData.c);
+  // Special detection for top sensor (ball detection)
+  // Only needs to differentiate YELLOW vs WHITE balls
+  
+  uint16_t r = topData.r;
+  uint16_t g = topData.g;
+  uint16_t b = topData.b;
+  uint16_t c = topData.c;
+  
+  // Low brightness = no ball detected
+  if (c < 1000) {
+    return COLOR_UNKNOWN;
+  }
+  
+  // Calculate R/G ratio
+  // Yellow ball: R/G ratio is around 1.4-1.5 (R is significantly higher than G)
+  // White ball: R/G ratio is around 0.9-1.1 (R and G are balanced, or G > R)
+  
+  if (g > 0) {  // Prevent division by zero
+    float rgRatio = (float)r / (float)g;
+    
+    // Yellow detection: R is noticeably higher than G
+    if (rgRatio > 1.25) {
+      return COLOR_YELLOW;
+    }
+    // White detection: R and G are balanced or G is higher
+    else if (rgRatio >= 0.85 && rgRatio <= 1.25) {
+      return COLOR_WHITE;
+    }
+  }
+  
+  // Fallback to general classification
+  return classifyColor(r, g, b, c);
 }
 
 DetectedColor ColorSensors::getBackColor() {

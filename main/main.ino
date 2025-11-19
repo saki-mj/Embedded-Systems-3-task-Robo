@@ -254,7 +254,20 @@ void handlePushButtonControls() {
       return;
     }
     
-    // Stop current task
+    // SAFETY: Stop motors first to prevent runaway
+    stopAllMotors();
+    
+    // Stop line following if active
+    if (isLineFollowActive()) {
+      toggleLineFollow();
+    }
+    
+    // Stop wall following if active
+    if (wallFollow.isActive()) {
+      wallFollow.stop();
+    }
+    
+    // Now safely stop current task
     task1Plantation.stop();
     task2WallFollow.stop();
     task3Ramp.stop();

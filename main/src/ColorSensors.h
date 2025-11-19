@@ -2,14 +2,11 @@
  * Color Sensors Library - TCS34725 RGB Color Sensors
  * 
  * Three TCS34725 sensors connected via PCA9548A I2C Multiplexer:
- * - Bottom sensor on Channel 5
- * - Top sensor on Channel 2 (Ball Detection)
  * - Back sensor on Channel 1
- * Two TCS34725 sensors connected via PCA9548A I2C Multiplexer:
+ * - Top sensor on Channel 2 (Ball Detection)
  * - Bottom sensor on Channel 5
- * - Top sensor on Channel 1
  * 
- * I2C Address: 0x29 (both sensors, isolated by mux)
+ * I2C Address: 0x29 (all three sensors, isolated by mux)
  *********************************************************************/
 
 #ifndef COLORSENSORS_H
@@ -19,10 +16,10 @@
 #include <Adafruit_TCS34725.h>
 #include "I2CMux.h"
 
-// Color sensor channels on I2C multiplexer
-#define BOTTOM_COLOR_CHANNEL 5
-#define TOP_COLOR_CHANNEL 2      // For ball detection
-#define BACK_COLOR_CHANNEL 1     // Back sensor
+// Color sensor channels on I2C multiplexer (verified hardware mapping)
+#define BOTTOM_COLOR_CHANNEL 5   // Channel 5 - Bottom sensor
+#define TOP_COLOR_CHANNEL 2      // Channel 2 - Top sensor (Ball detection)
+#define BACK_COLOR_CHANNEL 1     // Channel 1 - Back sensor
 
 // Color sensor I2C address (default for TCS34725)
 #define TCS34725_ADDRESS 0x29
