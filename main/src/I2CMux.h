@@ -14,7 +14,8 @@
 
 // I2C Multiplexer Channels
 #define MUX_CHANNEL_0 0  // SCL0/SDA0 - Left TOF
-#define MUX_CHANNEL_1 1  // SCL1/SDA1 - Color Sensor Top
+#define MUX_CHANNEL_1 1  // SCL1/SDA1 - Back Color Sensor
+#define MUX_CHANNEL_2 2  // SCL2/SDA2 - Top Color Sensor (Ball Detection)
 #define MUX_CHANNEL_3 3  // SCL3/SDA3 - Right TOF
 #define MUX_CHANNEL_4 4  // SCL4/SDA4 - Front TOF
 #define MUX_CHANNEL_5 5  // SCL5/SDA5 - Bottom Color Sensor

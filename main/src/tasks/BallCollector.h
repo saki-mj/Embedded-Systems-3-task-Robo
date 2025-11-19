@@ -6,6 +6,12 @@
 #define BALLCOLLECTOR_H
 
 #include <Arduino.h>
+#include <ESP32Servo.h>
+
+// Servo pin definitions
+#define ARM_SERVO_PIN 35
+#define GRIPPER_SERVO_PIN 36
+#define SORTING_SERVO_PIN 37
 
 class BallCollector {
 private:
@@ -18,9 +24,25 @@ private:
   int tofThreshold;
   int colorThreshold;
   
-  // Servo positions (to be defined later based on hardware)
-  int servoOpenPosition;
-  int servoClosePosition;
+  // Servo objects
+  Servo armServo;
+  Servo gripperServo;
+  Servo sortingServo;
+  
+  // Servo position variables (to be calibrated)
+  int armPos0;        // Arm home position
+  int armPos1;        // Arm pickup position
+  int gripperPos0;    // Gripper open
+  int gripperPos1;    // Gripper closed
+  int sortingPos0;    // Sorting yellow position
+  int sortingPos1;    // Sorting initial/home position
+  int sortingPos2;    // Sorting white position
+  
+  // Timing delay variables (in milliseconds, to be calibrated)
+  unsigned long servoMoveDelay;       // Delay after servo movement
+  unsigned long colorDetectDelay;     // Delay before color detection
+  unsigned long sortingDelay;         // Delay at sorting position
+  unsigned long completionDelay;      // Delay after sorting before DONE
   
 public:
   BallCollector();
@@ -49,8 +71,39 @@ public:
   void setTOFThreshold(int threshold);
   void setColorThreshold(int threshold);
   
-  // Set servo positions (for future hardware implementation)
-  void setServoPositions(int openPos, int closePos);
+  // Set servo positions (for calibration)
+  void setArmPositions(int pos0, int pos1);
+  void setGripperPositions(int pos0, int pos1);
+  void setSortingPositions(int pos0, int pos1, int pos2);
+  
+  // Servo control methods
+  void moveArmTo(int position);
+  void moveGripperTo(int position);
+  void moveSortingTo(int position);
+  
+  // Get current servo positions (for display)
+  int getArmPos0() { return armPos0; }
+  int getArmPos1() { return armPos1; }
+  int getGripperPos0() { return gripperPos0; }
+  int getGripperPos1() { return gripperPos1; }
+  int getSortingPos0() { return sortingPos0; }
+  int getSortingPos1() { return sortingPos1; }
+  int getSortingPos2() { return sortingPos2; }
+  
+  // Set timing delays (in milliseconds)
+  void setServoMoveDelay(unsigned long delay) { servoMoveDelay = delay; }
+  void setColorDetectDelay(unsigned long delay) { colorDetectDelay = delay; }
+  void setSortingDelay(unsigned long delay) { sortingDelay = delay; }
+  void setCompletionDelay(unsigned long delay) { completionDelay = delay; }
+  
+  // Get timing delays (for display)
+  unsigned long getServoMoveDelay() { return servoMoveDelay; }
+  unsigned long getColorDetectDelay() { return colorDetectDelay; }
+  unsigned long getSortingDelay() { return sortingDelay; }
+  unsigned long getCompletionDelay() { return completionDelay; }
+  
+  // Individual servo test/configuration method
+  void testServo(const String& servoName, int angle);
 };
 
 // Global instance
