@@ -66,6 +66,8 @@ bool ColorSensors::begin() {
       Serial.println("  Bottom color sensor (Ch 5): FAILED after retry");
       bottomInitialized = false;
     }
+    Serial.println("  Bottom color sensor (Ch 5): FAILED");
+    bottomInitialized = false;
   }
   
   mux->disableAll();
@@ -73,6 +75,7 @@ bool ColorSensors::begin() {
   
   // Initialize top sensor (Channel 2)
   Serial.print("Selecting Channel "); Serial.print(TOP_COLOR_CHANNEL); Serial.println(" for Top sensor...");
+  // Initialize top sensor (Channel 1)
   mux->selectChannel(TOP_COLOR_CHANNEL);
   delay(100);
   
@@ -122,6 +125,10 @@ bool ColorSensors::begin() {
       Serial.println("  Back color sensor (Ch 1): FAILED after retry");
       backInitialized = false;
     }
+    Serial.println("  Top color sensor (Ch 1): OK");
+  } else {
+    Serial.println("  Top color sensor (Ch 1): FAILED");
+    topInitialized = false;
   }
   
   mux->disableAll();

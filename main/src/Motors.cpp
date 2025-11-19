@@ -1,6 +1,10 @@
 // -------------------------------------------------------------------------
 // Motors.cpp - TB6612 Motor Driver Library Implementation
 // -------------------------------------------------------------------------
+// DESIGN PRINCIPLE: Low-level motor control functions DO NOT print serial output
+// to prevent spam when called repeatedly in loops or tasks.
+// High-level task code and manual serial commands handle status messages.
+// -------------------------------------------------------------------------
 
 #include "Motors.h"
 #include "IRReading.h"
@@ -91,22 +95,22 @@ void setMotorB(int speed, bool forward) {
 
 void leftMotorForward() {
   setMotorA(currentSpeed, true);
-  Serial.println("Left Motor Forward");
+  // Serial output removed to prevent spam - only used for manual commands via serial
 }
 
 void leftMotorBackward() {
   setMotorA(currentSpeed, false);
-  Serial.println("Left Motor Backward");
+  // Serial output removed to prevent spam - only used for manual commands via serial
 }
 
 void rightMotorForward() {
   setMotorB(currentSpeed, true);
-  Serial.println("Right Motor Forward");
+  // Serial output removed to prevent spam - only used for manual commands via serial
 }
 
 void rightMotorBackward() {
   setMotorB(currentSpeed, false);
-  Serial.println("Right Motor Backward");
+  // Serial output removed to prevent spam - only used for manual commands via serial
 }
 
 // -------------------------------------------------------------------------
@@ -116,33 +120,35 @@ void rightMotorBackward() {
 void robotForward() {
   setMotorA(currentSpeed, true);
   setMotorB(currentSpeed, true);
-  Serial.println("Robot Forward");
+  // Serial output removed to prevent spam in loops - use task-level status messages instead
 }
 
 void robotBackward() {
   setMotorA(currentSpeed, false);
   setMotorB(currentSpeed, false);
-  Serial.println("Robot Backward");
+  // Serial output removed to prevent spam in loops - use task-level status messages instead
 }
 
 void robotTurnLeft() {
   // Left motor backward, right motor forward (spin turn)
   setMotorA(currentSpeed / 2, false);
   setMotorB(currentSpeed, true);
-  Serial.println("Robot Turn Left");
+  // Serial output removed to prevent spam in loops - use task-level status messages instead
 }
 
 void robotTurnRight() {
   // Left motor forward, right motor backward (spin turn)
   setMotorA(currentSpeed, true);
   setMotorB(currentSpeed / 2, false);
-  Serial.println("Robot Turn Right");
+  // Serial output removed to prevent spam in loops - use task-level status messages instead
 }
 
 void stopAllMotors() {
   setMotorA(0, true);
   setMotorB(0, true);
-  Serial.println("All Motors Stopped");
+  // NOTE: Serial output removed to prevent spam when called in loops/tasks
+  // Tasks should print their own contextual status messages
+  // Manual STOP command in SerialCommands.cpp will print status
 }
 
 // -------------------------------------------------------------------------

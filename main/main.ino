@@ -21,6 +21,20 @@
 #include "src/tasks/BallCollector.h"
 
 // -------------------------------------------------------------------------
+// Activity Tracking for QR Code Display
+// -------------------------------------------------------------------------
+
+unsigned long lastActivityTime = 0;
+const unsigned long INACTIVITY_TIMEOUT = 30000; // 30 seconds in milliseconds
+bool qrCodeDisplayed = false;
+const String GITHUB_REPO_URL = "https://github.com/saki-mj/Embedded-Systems-3-task-Robo.git";
+
+void updateActivity() {
+  lastActivityTime = millis();
+  qrCodeDisplayed = false;
+}
+
+// -------------------------------------------------------------------------
 // Setup and Loop
 // -------------------------------------------------------------------------
 
@@ -79,6 +93,9 @@ void setup() {
   oledDisplay.show("Robot Ready", "Type HELP");
   delay(2000);
   oledDisplay.showStatus("Idle", getCurrentSpeed());
+  
+  // Initialize activity tracking
+  updateActivity();
 }
 
 void loop() {
@@ -91,7 +108,16 @@ void loop() {
   // Check for serial commands
   if (Serial.available() > 0) {
     String command = Serial.readStringUntil('\n');
+    updateActivity(); // Reset inactivity timer on serial command
     processSerialCommand(command);
+  }
+  
+  // Check for inactivity and display QR code
+  unsigned long currentTime = millis();
+  if (!qrCodeDisplayed && (currentTime - lastActivityTime >= INACTIVITY_TIMEOUT)) {
+    oledDisplay.showQRCode(GITHUB_REPO_URL);
+    qrCodeDisplayed = true;
+    Serial.println("Displaying QR code due to 30 seconds of inactivity");
   }
   
   // Update state machine
@@ -100,18 +126,23 @@ void loop() {
   // Execute current task based on state
   switch(stateMachine.getState()) {
     case STATE_TASK1_PLANTATION:
+      updateActivity(); // Reset timer when task is active
       task1Plantation.execute();
       break;
     case STATE_TASK2_WALL_FOLLOW:
+      updateActivity(); // Reset timer when task is active
       task2WallFollow.execute();
       break;
     case STATE_TASK3_RAMP:
+      updateActivity(); // Reset timer when task is active
       task3Ramp.execute();
       break;
     case STATE_TASK4_BARCODE:
+      updateActivity(); // Reset timer when task is active
       task4Barcode.execute();
       break;
     case STATE_TASK5_UNLOADING:
+      updateActivity(); // Reset timer when task is active
       task5Unloading.execute();
       break;
     default:
@@ -184,6 +215,7 @@ void loop() {
 void handlePushButtonControls() {
   // DOWN button - Emergency Stop
   if (pushButton.wasPressed(BTN_DOWN)) {
+    updateActivity(); // Reset timer on button press
     Serial.println("\n*** EMERGENCY STOP - Button Pressed ***");
     stateMachine.emergencyStop();
     // Stop all motors
@@ -210,6 +242,7 @@ void handlePushButtonControls() {
   
   // RIGHT button - Change Tasks (cycle through tasks)
   if (pushButton.wasPressed(BTN_RIGHT)) {
+    updateActivity(); // Reset timer on button press
     RobotState currentState = stateMachine.getState();
     RobotState nextState;
     

@@ -55,6 +55,9 @@ class OLEDDisplay {
     
     // Show line following state
     void showLineFollowing(bool active, float error);
+    
+    // Show QR code for GitHub repository
+    void showQRCode(const String& url);
 };
 
 // Global OLED display object

@@ -36,39 +36,48 @@ void processSerialCommand(String command) {
   // Individual Motor Control
   else if (command == "LMF") {
     leftMotorForward();
+    Serial.println("Left Motor Forward");
     oledDisplay.show("Left Motor", "Forward");
   }
   else if (command == "LMB") {
     leftMotorBackward();
+    Serial.println("Left Motor Backward");
     oledDisplay.show("Left Motor", "Backward");
   }
   else if (command == "RMF") {
     rightMotorForward();
+    Serial.println("Right Motor Forward");
     oledDisplay.show("Right Motor", "Forward");
   }
   else if (command == "RMB") {
     rightMotorBackward();
+    Serial.println("Right Motor Backward");
     oledDisplay.show("Right Motor", "Backward");
   }
   // Robot Movement
   else if (command == "RF") {
     robotForward();
+    Serial.println("Robot Forward");
     oledDisplay.show("Robot", "Forward");
   }
   else if (command == "RB") {
     robotBackward();
+    Serial.println("Robot Backward");
     oledDisplay.show("Robot", "Backward");
   }
   else if (command == "RTL") {
     robotTurnLeft();
+    Serial.println("Robot Turn Left");
     oledDisplay.show("Robot", "Turn Left");
   }
   else if (command == "RTR") {
     robotTurnRight();
+    Serial.println("Robot Turn Right");
     oledDisplay.show("Robot", "Turn Right");
   }
   else if (command == "STOP") {
     stopAllMotors();
+    Serial.println("All Motors Stopped");
     // Stop all tasks
     task1Plantation.stop();
     task2WallFollow.stop();
@@ -82,6 +91,7 @@ void processSerialCommand(String command) {
     // Stop wall following
     if (wallFollow.isActive()) {
       wallFollow.stop();
+      Serial.println("Wall Following stopped");
     }
     // Stop IR reading modes
     if (isIRReadingActive()) {
@@ -500,6 +510,75 @@ void printSerialCommands() {
   Serial.println("  WFKP <value> - Set wall follow Kp gain (1.0)");
   Serial.println("  WFKD <value> - Set wall follow Kd gain (0.5)");
   Serial.println("  WFDIST <mm> - Set wall follow target distance (150)");
+  Serial.println();
+  Serial.println("Task 1 Plantation Configuration:");
+  Serial.print("  T1SEARCHSPD <speed> - Search speed (");
+  Serial.print(task1Plantation.getSearchSpeed());
+  Serial.println(")");
+  Serial.print("  T1FOLLOWSPD <speed> - Follow speed (");
+  Serial.print(task1Plantation.getFollowSpeed());
+  Serial.println(")");
+  Serial.print("  T1TURNSPD <speed> - Turn speed (");
+  Serial.print(task1Plantation.getTurnSpeed());
+  Serial.println(")");
+  Serial.print("  T1TURNDUR <ms> - Turn duration for 90° (");
+  Serial.print(task1Plantation.getTurnDuration());
+  Serial.println(")");
+  Serial.print("  T1SEARCHDUR <ms> - Search duration (");
+  Serial.print(task1Plantation.getSearchDuration());
+  Serial.println(")");
+  Serial.print("  T1COLLECTDUR <ms> - Ball collection duration (");
+  Serial.print(task1Plantation.getCollectDuration());
+  Serial.println(")");
+  Serial.print("  T1BALLTHRESH <value> - Ball detection threshold (");
+  Serial.print(task1Plantation.getBallDetectionThreshold());
+  Serial.println(")");
+  Serial.println();
+  Serial.println("Task 2 Wall Follow Configuration:");
+  Serial.print("  T2APPSPD <speed> - Approach speed (");
+  Serial.print(task2WallFollow.getApproachSpeed());
+  Serial.println(")");
+  Serial.print("  T2FOLLOWSPD <speed> - Follow speed (");
+  Serial.print(task2WallFollow.getFollowSpeed());
+  Serial.println(")");
+  Serial.print("  T2TURNSPD <speed> - Turn speed (");
+  Serial.print(task2WallFollow.getTurnSpeed());
+  Serial.println(")");
+  Serial.print("  T2WALLDIST <mm> - Wall detection distance (");
+  Serial.print(task2WallFollow.getWallDetectionDistance());
+  Serial.println(")");
+  Serial.print("  T2TARGETDIST <mm> - Target wall distance (");
+  Serial.print(task2WallFollow.getTargetWallDistance());
+  Serial.println(")");
+  Serial.print("  T2TURNDUR <ms> - Turn duration for 90° (");
+  Serial.print(task2WallFollow.getTurnDuration());
+  Serial.println(")");
+  Serial.print("  T2ALIGNDUR <ms> - Alignment duration (");
+  Serial.print(task2WallFollow.getAlignDuration());
+  Serial.println(")");
+  Serial.println();
+  Serial.println("Task 3 Ramp Configuration:");
+  Serial.print("  T3APPSPD <speed> - Approach speed (");
+  Serial.print(task3Ramp.getApproachSpeed());
+  Serial.println(")");
+  Serial.print("  T3CLIMBSPD <speed> - Climb speed (");
+  Serial.print(task3Ramp.getClimbSpeed());
+  Serial.println(")");
+  Serial.print("  T3DESCSPD <speed> - Descend speed (");
+  Serial.print(task3Ramp.getDescendSpeed());
+  Serial.println(")");
+  Serial.print("  T3CLIMBDUR <ms> - Climb duration (");
+  Serial.print(task3Ramp.getClimbDuration());
+  Serial.println(")");
+  Serial.print("  T3DESCDUR <ms> - Descend duration (");
+  Serial.print(task3Ramp.getDescendDuration());
+  Serial.println(")");
+  Serial.print("  T3RAMPDIST <mm> - Ramp detection distance (");
+  Serial.print(task3Ramp.getRampDetectionDistance());
+  Serial.println(")");
+  Serial.print("  T3TOPTHRESH <mm> - Top detection threshold (");
+  Serial.print(task3Ramp.getTopDetectionThreshold());
+  Serial.println(")");
   Serial.println();
   Serial.println("Task 4 Barcode Configuration:");
   Serial.print("  T4WALLDIST <mm> - Wall detection distance (");

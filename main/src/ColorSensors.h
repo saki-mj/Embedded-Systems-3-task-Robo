@@ -5,6 +5,9 @@
  * - Bottom sensor on Channel 5
  * - Top sensor on Channel 2 (Ball Detection)
  * - Back sensor on Channel 1
+ * Two TCS34725 sensors connected via PCA9548A I2C Multiplexer:
+ * - Bottom sensor on Channel 5
+ * - Top sensor on Channel 1
  * 
  * I2C Address: 0x29 (both sensors, isolated by mux)
  *********************************************************************/
