@@ -5,10 +5,10 @@
 #include "Adafruit_VL53L0X.h"
 #include "I2CMux.h"
 
-// TOF Sensor positions
-#define TOF_LEFT   0
-#define TOF_FRONT  1
-#define TOF_RIGHT  2
+// TOF Sensor positions (I2C Mux Channels)
+#define TOF_LEFT   0  // Channel 0
+#define TOF_FRONT  4  // Channel 4
+#define TOF_RIGHT  3  // Channel 3
 
 // Distance thresholds (in mm)
 #define TOF_OBSTACLE_THRESHOLD 200  // Default obstacle detection distance

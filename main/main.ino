@@ -2,6 +2,7 @@
 // Motor Control with IR Sensors and TOF Sensors - Complete Robot Control
 // -------------------------------------------------------------------------
 
+#include <ESP32Servo.h>
 #include "src/Motors.h"
 #include "src/IRReading.h"
 #include "src/LineFollow.h"
@@ -174,6 +175,37 @@ void loop() {
     readTOFSensors();
     printTOFValues();
   }
+  // If color sensor continuous reading is active, print values
+  else if (colorSensors.isBottomContinuousReading()) {
+    colorSensors.readBottomSensor();
+    ColorData data = colorSensors.getBottomColorData();
+    Serial.print("Bottom: R="); Serial.print(data.r);
+    Serial.print(" G="); Serial.print(data.g);
+    Serial.print(" B="); Serial.print(data.b);
+    Serial.print(" C="); Serial.print(data.c);
+    Serial.print(" Color="); Serial.println(colorSensors.getColorName(colorSensors.getBottomColor()));
+    delay(200);
+  }
+  else if (colorSensors.isTopContinuousReading()) {
+    colorSensors.readTopSensor();
+    ColorData data = colorSensors.getTopColorData();
+    Serial.print("Top: R="); Serial.print(data.r);
+    Serial.print(" G="); Serial.print(data.g);
+    Serial.print(" B="); Serial.print(data.b);
+    Serial.print(" C="); Serial.print(data.c);
+    Serial.print(" Color="); Serial.println(colorSensors.getColorName(colorSensors.getTopColor()));
+    delay(200);
+  }
+  else if (colorSensors.isBackContinuousReading()) {
+    colorSensors.readBackSensor();
+    ColorData data = colorSensors.getBackColorData();
+    Serial.print("Back: R="); Serial.print(data.r);
+    Serial.print(" G="); Serial.print(data.g);
+    Serial.print(" B="); Serial.print(data.b);
+    Serial.print(" C="); Serial.print(data.c);
+    Serial.print(" Color="); Serial.println(colorSensors.getColorName(colorSensors.getBackColor()));
+    delay(200);
+  }
 }
 
 // -------------------------------------------------------------------------
@@ -222,7 +254,20 @@ void handlePushButtonControls() {
       return;
     }
     
-    // Stop current task
+    // SAFETY: Stop motors first to prevent runaway
+    stopAllMotors();
+    
+    // Stop line following if active
+    if (isLineFollowActive()) {
+      toggleLineFollow();
+    }
+    
+    // Stop wall following if active
+    if (wallFollow.isActive()) {
+      wallFollow.stop();
+    }
+    
+    // Now safely stop current task
     task1Plantation.stop();
     task2WallFollow.stop();
     task3Ramp.stop();

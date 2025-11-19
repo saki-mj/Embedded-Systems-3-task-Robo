@@ -1,11 +1,12 @@
 /*********************************************************************
  * Color Sensors Library - TCS34725 RGB Color Sensors
  * 
- * Two TCS34725 sensors connected via PCA9548A I2C Multiplexer:
+ * Three TCS34725 sensors connected via PCA9548A I2C Multiplexer:
+ * - Back sensor on Channel 1
+ * - Top sensor on Channel 2 (Ball Detection)
  * - Bottom sensor on Channel 5
- * - Top sensor on Channel 1
  * 
- * I2C Address: 0x29 (both sensors, isolated by mux)
+ * I2C Address: 0x29 (all three sensors, isolated by mux)
  *********************************************************************/
 
 #ifndef COLORSENSORS_H
@@ -15,9 +16,10 @@
 #include <Adafruit_TCS34725.h>
 #include "I2CMux.h"
 
-// Color sensor channels on I2C multiplexer
-#define BOTTOM_COLOR_CHANNEL 5
-#define TOP_COLOR_CHANNEL 1
+// Color sensor channels on I2C multiplexer (verified hardware mapping)
+#define BOTTOM_COLOR_CHANNEL 5   // Channel 5 - Bottom sensor
+#define TOP_COLOR_CHANNEL 2      // Channel 2 - Top sensor (Ball detection)
+#define BACK_COLOR_CHANNEL 1     // Channel 1 - Back sensor
 
 // Color sensor I2C address (default for TCS34725)
 #define TCS34725_ADDRESS 0x29
@@ -48,12 +50,20 @@ class ColorSensors {
     I2CMux* mux;
     Adafruit_TCS34725* bottomSensor;
     Adafruit_TCS34725* topSensor;
+    Adafruit_TCS34725* backSensor;
     
     ColorData bottomData;
     ColorData topData;
+    ColorData backData;
     
     bool bottomInitialized;
     bool topInitialized;
+    bool backInitialized;
+    
+    // Continuous reading flags
+    bool bottomContinuousReading;
+    bool topContinuousReading;
+    bool backContinuousReading;
     
     // Helper function to detect color from RGB values
     DetectedColor classifyColor(uint16_t r, uint16_t g, uint16_t b, uint16_t c);
@@ -68,13 +78,15 @@ class ColorSensors {
     // Read from specific sensor
     bool readBottomSensor();
     bool readTopSensor();
+    bool readBackSensor();
     
-    // Read both sensors
+    // Read all sensors
     void readAll();
     
     // Get raw color data
     ColorData getBottomColorData();
     ColorData getTopColorData();
+    ColorData getBackColorData();
     
     // Get specific color values
     uint16_t getBottomRed();
@@ -89,9 +101,16 @@ class ColorSensors {
     uint16_t getTopClear();
     uint16_t getTopLux();
     
+    uint16_t getBackRed();
+    uint16_t getBackGreen();
+    uint16_t getBackBlue();
+    uint16_t getBackClear();
+    uint16_t getBackLux();
+    
     // Detect dominant color
     DetectedColor getBottomColor();
     DetectedColor getTopColor();
+    DetectedColor getBackColor();
     
     // Get color name as string
     String getColorName(DetectedColor color);
@@ -99,6 +118,16 @@ class ColorSensors {
     // Check sensor status
     bool isBottomReady();
     bool isTopReady();
+    bool isBackReady();
+    
+    // Continuous reading control
+    void toggleBottomContinuousReading();
+    void toggleTopContinuousReading();
+    void toggleBackContinuousReading();
+    bool isBottomContinuousReading();
+    bool isTopContinuousReading();
+    bool isBackContinuousReading();
+    void stopAllContinuousReading();
 };
 
 // Global instance
@@ -107,5 +136,6 @@ extern ColorSensors colorSensors;
 // Initialization function
 void initColorSensors();
 void printColorValues();
+void scanColorSensors();
 
 #endif
