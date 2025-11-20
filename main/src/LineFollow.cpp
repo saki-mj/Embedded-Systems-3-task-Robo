@@ -134,9 +134,6 @@ void executeLineFollow() {
   // Calculate PD correction
   int correction = calculatePD(position);
   
-  // Get current base speed from motor config
-  int baseSpeed = getCurrentSpeed();
-  
   // Calculate left and right motor speeds
   int leftSpeed = baseSpeed + correction;
   int rightSpeed = baseSpeed - correction;
@@ -174,7 +171,7 @@ void toggleLineFollow() {
     Serial.println("Line Following: ENABLED");
     Serial.print("Kp: "); Serial.print(Kp);
     Serial.print(" | Kd: "); Serial.println(Kd);
-    Serial.print("Base Speed: "); Serial.println(getCurrentSpeed());
+    Serial.print("Base Speed: "); Serial.println(baseSpeed);
   } else {
     stopAllMotors();
     Serial.println("Line Following: DISABLED");

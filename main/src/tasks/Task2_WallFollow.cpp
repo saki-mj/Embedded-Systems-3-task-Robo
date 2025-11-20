@@ -22,9 +22,6 @@ Task2WallFollow::Task2WallFollow() {
   taskActive = false;
   
   // Default configuration (can be changed via serial commands)
-  approachSpeed = 70;
-  followSpeed = 65;
-  turnSpeed = 55;
   wallDetectionDistance = 150;  // mm
   targetWallDistance = 120;  // mm
   turnDuration = 1000;  // 1 second for 90° turn
@@ -138,24 +135,6 @@ void Task2WallFollow::reset() {
 }
 
 // Configuration setters
-void Task2WallFollow::setApproachSpeed(uint16_t speed) {
-  approachSpeed = speed;
-  Serial.print("T2 Approach speed set to: ");
-  Serial.println(speed);
-}
-
-void Task2WallFollow::setFollowSpeed(uint16_t speed) {
-  followSpeed = speed;
-  Serial.print("T2 Follow speed set to: ");
-  Serial.println(speed);
-}
-
-void Task2WallFollow::setTurnSpeed(uint16_t speed) {
-  turnSpeed = speed;
-  Serial.print("T2 Turn speed set to: ");
-  Serial.println(speed);
-}
-
 void Task2WallFollow::setWallDetectionDistance(uint16_t distance) {
   wallDetectionDistance = distance;
   Serial.print("T2 Wall detection distance set to: ");
@@ -185,18 +164,6 @@ void Task2WallFollow::setAlignDuration(unsigned long timeMs) {
 }
 
 // Configuration getters
-uint16_t Task2WallFollow::getApproachSpeed() {
-  return approachSpeed;
-}
-
-uint16_t Task2WallFollow::getFollowSpeed() {
-  return followSpeed;
-}
-
-uint16_t Task2WallFollow::getTurnSpeed() {
-  return turnSpeed;
-}
-
 uint16_t Task2WallFollow::getWallDetectionDistance() {
   return wallDetectionDistance;
 }

@@ -16,7 +16,6 @@ WallFollow::WallFollow() {
   kp = 1.0;
   kd = 0.5;
   targetDistance = 150;  // 15cm default
-  baseSpeed = 60;
   maxCorrection = 100;
   lastError = 0;
   lastUpdateTime = 0;
@@ -27,7 +26,6 @@ void WallFollow::init() {
   kp = 1.0;
   kd = 0.5;
   targetDistance = 150;
-  baseSpeed = 60;
   maxCorrection = 100;
   lastError = 0;
   lastUpdateTime = millis();
@@ -57,14 +55,6 @@ void WallFollow::setTargetDistance(uint16_t distance) {
     Serial.print("Wall Follow target distance set to: ");
     Serial.print(targetDistance);
     Serial.println(" mm");
-  }
-}
-
-void WallFollow::setBaseSpeed(uint16_t speed) {
-  if (baseSpeed != speed) {
-    baseSpeed = speed;
-    Serial.print("Wall Follow base speed set to: ");
-    Serial.println(baseSpeed);
   }
 }
 
@@ -116,8 +106,7 @@ void WallFollow::executeWallFollow(uint16_t leftDistance) {
   leftSpeed = constrain(leftSpeed, 0, 255);
   rightSpeed = constrain(rightSpeed, 0, 255);
   
-  // Apply motor speeds
-  setCurrentSpeed(baseSpeed);  // Set base speed
+  // Apply motor speeds (baseSpeed is global variable from main.ino)
   setLeftMotorSpeed(leftSpeed);
   setRightMotorSpeed(rightSpeed);
   robotForward();
