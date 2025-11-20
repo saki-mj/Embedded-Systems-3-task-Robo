@@ -385,6 +385,25 @@ void processSerialCommand(String command) {
     task4Barcode.setIRWhiteThreshold(thresh);
     oledDisplay.show("T4 IR Thresh", String(thresh));
   }
+  // Task 5 Unloading: manual barcode and quality
+  else if (command.startsWith("T5BARCODEBIN ")) {
+    String bin = command.substring(13);
+    task5Unloading.setBarcodeBinary(bin);
+    oledDisplay.show("T5 Barcode", bin);
+  }
+  else if (command.startsWith("T5BARCODEVAL ")) {
+    uint16_t val = command.substring(13).toInt();
+    task5Unloading.setBarcodeValue(val);
+    oledDisplay.show("T5 Barcode", String(val));
+  }
+  else if (command.startsWith("T5QUALITY ")) {
+    String q = command.substring(9);
+    q.trim();
+    q.toUpperCase();
+    if (q == "GOOD") task5Unloading.setPotatoQuality(POTATO_GOOD);
+    else if (q == "BAD") task5Unloading.setPotatoQuality(POTATO_BAD);
+    else Serial.println("T5QUALITY must be GOOD or BAD");
+  }
   // Ball Collector Commands
   else if (command == "BALLCOLLECT") {
     Serial.println("Starting ball collection sequence...");
@@ -641,6 +660,11 @@ void printSerialCommands() {
   Serial.print("  T4IRTHRESH <value> - IR threshold: >value=white(1) (");
   Serial.print(task4Barcode.getIRWhiteThreshold());
   Serial.println(")");
+  Serial.println();
+  Serial.println("Task 5 Unloading Configuration:");
+  Serial.println("  T5BARCODEBIN <bin> - Set barcode as binary string (e.g. 1010)");
+  Serial.println("  T5BARCODEVAL <val> - Set barcode as integer value (e.g. 10)");
+  Serial.println("  T5QUALITY <GOOD|BAD> - Set potato/ball quality");
   Serial.println();
   Serial.println("Ball Collector:");
   Serial.println("  BALLCOLLECT - Execute ball collection sequence");
