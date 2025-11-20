@@ -114,9 +114,6 @@ class Task5Unloading {
     void setTargetBallCount(uint16_t count);
 
     // Configuration getters
-    uint16_t getNavigateSpeed();
-    uint16_t getAlignSpeed();
-    uint16_t getUnloadSpeed();
     unsigned long getUnloadDuration();
     unsigned long getAlignDuration();
     uint16_t getZoneDetectionDistance();

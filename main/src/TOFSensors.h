@@ -9,6 +9,7 @@
 #define TOF_LEFT   0  // Channel 0
 #define TOF_FRONT  4  // Channel 4
 #define TOF_RIGHT  3  // Channel 3
+#define TOF_BACK   7  // Channel 7
 
 // Distance thresholds (in mm)
 #define TOF_OBSTACLE_THRESHOLD 200  // Default obstacle detection distance
@@ -20,14 +21,25 @@ class TOFSensors {
     Adafruit_VL53L0X* loxLeft;
     Adafruit_VL53L0X* loxFront;
     Adafruit_VL53L0X* loxRight;
+    Adafruit_VL53L0X* loxBack;
     
     uint16_t distanceLeft;
     uint16_t distanceFront;
     uint16_t distanceRight;
+    uint16_t distanceBack;
     
     bool leftValid;
     bool frontValid;
     bool rightValid;
+    bool backValid;
+    
+    // Calibration errors (offset to subtract from readings)
+    int16_t errorLeft;
+    int16_t errorFront;
+    int16_t errorRight;
+    int16_t errorBack;
+    
+    bool calibrated;
     
     uint16_t obstacleThreshold;
     
@@ -43,15 +55,17 @@ class TOFSensors {
     // Read all sensors
     void readAll();
     
-    // Get individual distances
+    // Get individual distances (with error correction)
     uint16_t getLeftDistance();
     uint16_t getFrontDistance();
     uint16_t getRightDistance();
+    uint16_t getBackDistance();
     
     // Check if obstacle detected
     bool isObstacleLeft();
     bool isObstacleFront();
     bool isObstacleRight();
+    bool isObstacleBack();
     
     // Set obstacle detection threshold
     void setObstacleThreshold(uint16_t threshold);
@@ -63,10 +77,26 @@ class TOFSensors {
     bool isLeftValid();
     bool isFrontValid();
     bool isRightValid();
+    bool isBackValid();
+    
+    // Calibration methods
+    void calibrate();
+    void setErrorLeft(int16_t error);
+    void setErrorFront(int16_t error);
+    void setErrorRight(int16_t error);
+    void setErrorBack(int16_t error);
+    int16_t getErrorLeft();
+    int16_t getErrorFront();
+    int16_t getErrorRight();
+    int16_t getErrorBack();
+    bool isCalibrated();
     
     // Toggle continuous reading mode
     void toggleContinuousReading();
     bool isContinuousReadingActive();
+    
+    // Read only back sensor
+    void readBack();
 };
 
 // Global TOF sensor object

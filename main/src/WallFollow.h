@@ -19,7 +19,6 @@ class WallFollow {
     unsigned long lastUpdateTime;
     
     // Configuration
-    uint16_t baseSpeed;          // Base speed for wall following
     int maxCorrection;           // Maximum correction value
     
     bool active;
@@ -30,7 +29,6 @@ class WallFollow {
     void setKp(float newKp);
     void setKd(float newKd);
     void setTargetDistance(uint16_t distance);
-    void setBaseSpeed(uint16_t speed);
     void setMaxCorrection(int correction);
     
     float getKp();

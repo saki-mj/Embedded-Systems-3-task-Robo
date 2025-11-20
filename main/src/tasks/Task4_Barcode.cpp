@@ -27,9 +27,6 @@ Task4Barcode::Task4Barcode() {
   // Default configuration (all can be changed via serial commands)
   wallDetectionDistance = 200;  // 20cm in mm
   wallFollowDistance = 150;     // 15cm target for wall following
-  barcodeSpeed = 50;            // Moderate speed for reading
-  approachSpeed = 70;           // Speed while navigating
-  turnSpeed = 60;               // Speed while turning
   turnRightDuration = 1000;     // 1 second for right turn 90 degrees
   turnLeftDuration = 1000;      // 1 second for left turn 90 degrees
   straightDuration = 1000;      // 1 second for straight movement
@@ -87,9 +84,8 @@ void Task4Barcode::execute() {
         wallFollow.start();
       }
       
-      // Use wall following with left TOF sensor
+      // Use wall following with left TOF sensor (uses global baseSpeed)
       wallFollow.setTargetDistance(wallFollowDistance);
-      wallFollow.setBaseSpeed(approachSpeed);
       wallFollow.executeWallFollow(tofSensors.getLeftDistance());
       
       // Only change state when FRONT TOF detects wall
@@ -116,8 +112,7 @@ void Task4Barcode::execute() {
           printedOnce = true;
         }
         
-        setCurrentSpeed(turnSpeed);
-        robotTurnRight();
+        robotTurnRight();  // Uses global rotateSpeed
         
         if (isTurnComplete()) {
           stopAllMotors();
@@ -140,9 +135,8 @@ void Task4Barcode::execute() {
         wallFollow.start();
       }
       
-      // Use wall following with left TOF sensor
+      // Use wall following with left TOF sensor (uses global baseSpeed)
       wallFollow.setTargetDistance(wallFollowDistance);
-      wallFollow.setBaseSpeed(approachSpeed);
       wallFollow.executeWallFollow(tofSensors.getLeftDistance());
       
       // Only change state when FRONT TOF detects wall
@@ -169,8 +163,7 @@ void Task4Barcode::execute() {
           printedOnce = true;
         }
         
-        setCurrentSpeed(turnSpeed);
-        robotTurnLeft();
+        robotTurnLeft();  // Uses global rotateSpeed
         
         if (isTurnComplete()) {
           stopAllMotors();
@@ -193,8 +186,7 @@ void Task4Barcode::execute() {
           printedOnce = true;
         }
         
-        setCurrentSpeed(approachSpeed);
-        robotBackward();
+        robotBackward();  // Uses global baseSpeed
         
         if (currentTime - reverseStartTime >= reverseDuration) {
           stopAllMotors();
@@ -228,8 +220,7 @@ void Task4Barcode::execute() {
           printedOnce = true;
         }
         
-        setCurrentSpeed(barcodeSpeed);
-        robotForward();
+        robotForward();  // Uses global baseSpeed
         readBarcodeBar();
         
         // Check if barcode reading is complete
@@ -500,18 +491,6 @@ void Task4Barcode::setBarcodeSpeed(uint16_t speed) {
   Serial.println(speed);
 }
 
-void Task4Barcode::setApproachSpeed(uint16_t speed) {
-  approachSpeed = speed;
-  Serial.print("T4 Approach speed set to: ");
-  Serial.println(speed);
-}
-
-void Task4Barcode::setTurnSpeed(uint16_t speed) {
-  turnSpeed = speed;
-  Serial.print("T4 Turn speed set to: ");
-  Serial.println(speed);
-}
-
 void Task4Barcode::setTurnRightDuration(unsigned long timeMs) {
   turnRightDuration = timeMs;
   Serial.print("T4 Turn RIGHT duration set to: ");
@@ -553,18 +532,6 @@ uint16_t Task4Barcode::getWallDetectionDistance() {
 
 uint16_t Task4Barcode::getWallFollowDistance() {
   return wallFollowDistance;
-}
-
-uint16_t Task4Barcode::getBarcodeSpeed() {
-  return barcodeSpeed;
-}
-
-uint16_t Task4Barcode::getApproachSpeed() {
-  return approachSpeed;
-}
-
-uint16_t Task4Barcode::getTurnSpeed() {
-  return turnSpeed;
 }
 
 unsigned long Task4Barcode::getTurnRightDuration() {

@@ -112,9 +112,6 @@ Task1Plantation::Task1Plantation() {
   taskActive = false;
   
   // Default configuration (can be changed via serial commands)
-  searchSpeed = 60;
-  followSpeed = 70;
-  turnSpeed = 55;
   turnDuration = 1000;  // 1 second for 90° turn
   searchDuration = 5000;  // 5 seconds search time
   collectDuration = 2000;  // 2 seconds collection time
@@ -136,7 +133,7 @@ void Task1Plantation::init() {
   t1ReturningAlongLine = false;
   t1IntersectionLatched= false;
 
-  setSpeedLevel(T1_SPEED_LEVEL);   // medium speed (tune if needed)
+  // Using global baseSpeed and rotateSpeed from main.ino
 
   oledDisplay.show("Task 1", "Plantation", "Initialized");
   delay(1000);
@@ -553,24 +550,6 @@ void Task1Plantation::reset() {
 }
 
 // Configuration setters
-void Task1Plantation::setSearchSpeed(uint16_t speed) {
-  searchSpeed = speed;
-  Serial.print("T1 Search speed set to: ");
-  Serial.println(speed);
-}
-
-void Task1Plantation::setFollowSpeed(uint16_t speed) {
-  followSpeed = speed;
-  Serial.print("T1 Follow speed set to: ");
-  Serial.println(speed);
-}
-
-void Task1Plantation::setTurnSpeed(uint16_t speed) {
-  turnSpeed = speed;
-  Serial.print("T1 Turn speed set to: ");
-  Serial.println(speed);
-}
-
 void Task1Plantation::setTurnDuration(unsigned long timeMs) {
   turnDuration = timeMs;
   Serial.print("T1 Turn duration set to: ");
@@ -599,18 +578,6 @@ void Task1Plantation::setBallDetectionThreshold(uint16_t threshold) {
 }
 
 // Configuration getters
-uint16_t Task1Plantation::getSearchSpeed() {
-  return searchSpeed;
-}
-
-uint16_t Task1Plantation::getFollowSpeed() {
-  return followSpeed;
-}
-
-uint16_t Task1Plantation::getTurnSpeed() {
-  return turnSpeed;
-}
-
 unsigned long Task1Plantation::getTurnDuration() {
   return turnDuration;
 }

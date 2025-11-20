@@ -9,14 +9,24 @@ TOFSensors::TOFSensors() {
   loxLeft = new Adafruit_VL53L0X();
   loxFront = new Adafruit_VL53L0X();
   loxRight = new Adafruit_VL53L0X();
+  loxBack = new Adafruit_VL53L0X();
   
   distanceLeft = 0;
   distanceFront = 0;
   distanceRight = 0;
+  distanceBack = 0;
   
   leftValid = false;
   frontValid = false;
   rightValid = false;
+  backValid = false;
+  
+  // Initialize calibration errors to 0
+  errorLeft = 0;
+  errorFront = 0;
+  errorRight = 0;
+  errorBack = 0;
+  calibrated = false;
   
   obstacleThreshold = TOF_OBSTACLE_THRESHOLD;
   continuousReadingActive = false;
@@ -64,7 +74,18 @@ bool TOFSensors::begin() {
   }
   Serial.println("Right TOF initialized successfully");
   
-  Serial.println("=== All TOF Sensors Ready ===\n");
+  // Initialize Back TOF on Channel 7
+  Serial.println("Initializing Back TOF (Channel 7)...");
+  mux->selectChannel(MUX_CHANNEL_7);
+  delay(50);
+  if (!loxBack->begin()) {
+    Serial.println("ERROR: Failed to initialize Back TOF!");
+    return false;
+  }
+  Serial.println("Back TOF initialized successfully");
+  
+  Serial.println("=== All TOF Sensors Ready ===");
+  Serial.println("Run TOFCALIBRATE command to calibrate sensors\n");
   return true;
 }
 
@@ -76,7 +97,8 @@ void TOFSensors::readAll() {
   mux->selectChannel(MUX_CHANNEL_0);
   loxLeft->rangingTest(&measure, false);
   if (measure.RangeStatus != 4) {
-    distanceLeft = measure.RangeMilliMeter;
+    distanceLeft = measure.RangeMilliMeter - errorLeft;
+    if (distanceLeft < 0) distanceLeft = 0;
     leftValid = true;
   } else {
     distanceLeft = TOF_MAX_RANGE;
@@ -87,7 +109,8 @@ void TOFSensors::readAll() {
   mux->selectChannel(MUX_CHANNEL_4);
   loxFront->rangingTest(&measure, false);
   if (measure.RangeStatus != 4) {
-    distanceFront = measure.RangeMilliMeter;
+    distanceFront = measure.RangeMilliMeter - errorFront;
+    if (distanceFront < 0) distanceFront = 0;
     frontValid = true;
   } else {
     distanceFront = TOF_MAX_RANGE;
@@ -98,11 +121,24 @@ void TOFSensors::readAll() {
   mux->selectChannel(MUX_CHANNEL_3);
   loxRight->rangingTest(&measure, false);
   if (measure.RangeStatus != 4) {
-    distanceRight = measure.RangeMilliMeter;
+    distanceRight = measure.RangeMilliMeter - errorRight;
+    if (distanceRight < 0) distanceRight = 0;
     rightValid = true;
   } else {
     distanceRight = TOF_MAX_RANGE;
     rightValid = false;
+  }
+  
+  // Read Back TOF
+  mux->selectChannel(MUX_CHANNEL_7);
+  loxBack->rangingTest(&measure, false);
+  if (measure.RangeStatus != 4) {
+    distanceBack = measure.RangeMilliMeter - errorBack;
+    if (distanceBack < 0) distanceBack = 0;
+    backValid = true;
+  } else {
+    distanceBack = TOF_MAX_RANGE;
+    backValid = false;
   }
 }
 
@@ -119,6 +155,10 @@ uint16_t TOFSensors::getRightDistance() {
   return distanceRight;
 }
 
+uint16_t TOFSensors::getBackDistance() {
+  return distanceBack;
+}
+
 // Check if obstacle detected
 bool TOFSensors::isObstacleLeft() {
   return (leftValid && distanceLeft < obstacleThreshold);
@@ -130,6 +170,10 @@ bool TOFSensors::isObstacleFront() {
 
 bool TOFSensors::isObstacleRight() {
   return (rightValid && distanceRight < obstacleThreshold);
+}
+
+bool TOFSensors::isObstacleBack() {
+  return (backValid && distanceBack < obstacleThreshold);
 }
 
 // Set obstacle detection threshold
@@ -165,6 +209,14 @@ void TOFSensors::printDistances() {
   } else {
     Serial.print("Out of range");
   }
+  
+  Serial.print(" | Back: ");
+  if (backValid) {
+    Serial.print(distanceBack);
+    Serial.print(" mm");
+  } else {
+    Serial.print("Out of range");
+  }
   Serial.println();
 }
 
@@ -181,6 +233,131 @@ bool TOFSensors::isRightValid() {
   return rightValid;
 }
 
+bool TOFSensors::isBackValid() {
+  return backValid;
+}
+
+// Calibration methods
+void TOFSensors::calibrate() {
+  Serial.println("\n=== TOF Sensor Calibration ===");
+  Serial.println("Place robot in open area with no obstacles nearby.");
+  Serial.println("Calibrating in 3 seconds...");
+  delay(3000);
+  
+  VL53L0X_RangingMeasurementData_t measure;
+  
+  // Calibrate Left TOF
+  Serial.print("Calibrating Left TOF... ");
+  mux->selectChannel(MUX_CHANNEL_0);
+  delay(50);
+  loxLeft->rangingTest(&measure, false);
+  if (measure.RangeStatus != 4) {
+    errorLeft = measure.RangeMilliMeter - TOF_MAX_RANGE;
+    Serial.print("Error: ");
+    Serial.print(errorLeft);
+    Serial.println(" mm");
+  } else {
+    errorLeft = 0;
+    Serial.println("Out of range - setting error to 0");
+  }
+  
+  // Calibrate Front TOF
+  Serial.print("Calibrating Front TOF... ");
+  mux->selectChannel(MUX_CHANNEL_4);
+  delay(50);
+  loxFront->rangingTest(&measure, false);
+  if (measure.RangeStatus != 4) {
+    errorFront = measure.RangeMilliMeter - TOF_MAX_RANGE;
+    Serial.print("Error: ");
+    Serial.print(errorFront);
+    Serial.println(" mm");
+  } else {
+    errorFront = 0;
+    Serial.println("Out of range - setting error to 0");
+  }
+  
+  // Calibrate Right TOF
+  Serial.print("Calibrating Right TOF... ");
+  mux->selectChannel(MUX_CHANNEL_3);
+  delay(50);
+  loxRight->rangingTest(&measure, false);
+  if (measure.RangeStatus != 4) {
+    errorRight = measure.RangeMilliMeter - TOF_MAX_RANGE;
+    Serial.print("Error: ");
+    Serial.print(errorRight);
+    Serial.println(" mm");
+  } else {
+    errorRight = 0;
+    Serial.println("Out of range - setting error to 0");
+  }
+  
+  // Calibrate Back TOF
+  Serial.print("Calibrating Back TOF... ");
+  mux->selectChannel(MUX_CHANNEL_7);
+  delay(50);
+  loxBack->rangingTest(&measure, false);
+  if (measure.RangeStatus != 4) {
+    errorBack = measure.RangeMilliMeter - TOF_MAX_RANGE;
+    Serial.print("Error: ");
+    Serial.print(errorBack);
+    Serial.println(" mm");
+  } else {
+    errorBack = 0;
+    Serial.println("Out of range - setting error to 0");
+  }
+  
+  calibrated = true;
+  Serial.println("=== Calibration Complete ===\n");
+}
+
+void TOFSensors::setErrorLeft(int16_t error) {
+  errorLeft = error;
+  Serial.print("Left TOF error set to: ");
+  Serial.print(errorLeft);
+  Serial.println(" mm");
+}
+
+void TOFSensors::setErrorFront(int16_t error) {
+  errorFront = error;
+  Serial.print("Front TOF error set to: ");
+  Serial.print(errorFront);
+  Serial.println(" mm");
+}
+
+void TOFSensors::setErrorRight(int16_t error) {
+  errorRight = error;
+  Serial.print("Right TOF error set to: ");
+  Serial.print(errorRight);
+  Serial.println(" mm");
+}
+
+void TOFSensors::setErrorBack(int16_t error) {
+  errorBack = error;
+  Serial.print("Back TOF error set to: ");
+  Serial.print(errorBack);
+  Serial.println(" mm");
+}
+
+int16_t TOFSensors::getErrorLeft() {
+  return errorLeft;
+}
+
+int16_t TOFSensors::getErrorFront() {
+  return errorFront;
+}
+
+int16_t TOFSensors::getErrorRight() {
+  return errorRight;
+}
+
+int16_t TOFSensors::getErrorBack() {
+  return errorBack;
+}
+
+bool TOFSensors::isCalibrated() {
+  return calibrated;
+}
+
 void TOFSensors::toggleContinuousReading() {
   continuousReadingActive = !continuousReadingActive;
   if (continuousReadingActive) {
@@ -192,6 +369,22 @@ void TOFSensors::toggleContinuousReading() {
 
 bool TOFSensors::isContinuousReadingActive() {
   return continuousReadingActive;
+}
+
+// Read only back sensor
+void TOFSensors::readBack() {
+  VL53L0X_RangingMeasurementData_t measure;
+  
+  mux->selectChannel(MUX_CHANNEL_7);
+  loxBack->rangingTest(&measure, false);
+  if (measure.RangeStatus != 4) {
+    distanceBack = measure.RangeMilliMeter - errorBack;
+    if (distanceBack < 0) distanceBack = 0;
+    backValid = true;
+  } else {
+    distanceBack = TOF_MAX_RANGE;
+    backValid = false;
+  }
 }
 
 // Global functions

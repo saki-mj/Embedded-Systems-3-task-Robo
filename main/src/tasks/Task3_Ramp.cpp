@@ -22,9 +22,6 @@ Task3Ramp::Task3Ramp() {
   taskActive = false;
   
   // Default configuration (can be changed via serial commands)
-  approachSpeed = 65;
-  climbSpeed = 90;  // Higher speed for climbing
-  descendSpeed = 50;  // Lower speed for descending
   climbDuration = 3000;  // 3 seconds climb time
   descendDuration = 2500;  // 2.5 seconds descend time
   rampDetectionDistance = 100;  // mm
@@ -132,24 +129,6 @@ void Task3Ramp::reset() {
 }
 
 // Configuration setters
-void Task3Ramp::setApproachSpeed(uint16_t speed) {
-  approachSpeed = speed;
-  Serial.print("T3 Approach speed set to: ");
-  Serial.println(speed);
-}
-
-void Task3Ramp::setClimbSpeed(uint16_t speed) {
-  climbSpeed = speed;
-  Serial.print("T3 Climb speed set to: ");
-  Serial.println(speed);
-}
-
-void Task3Ramp::setDescendSpeed(uint16_t speed) {
-  descendSpeed = speed;
-  Serial.print("T3 Descend speed set to: ");
-  Serial.println(speed);
-}
-
 void Task3Ramp::setClimbDuration(unsigned long timeMs) {
   climbDuration = timeMs;
   Serial.print("T3 Climb duration set to: ");
@@ -179,18 +158,6 @@ void Task3Ramp::setTopDetectionThreshold(uint16_t threshold) {
 }
 
 // Configuration getters
-uint16_t Task3Ramp::getApproachSpeed() {
-  return approachSpeed;
-}
-
-uint16_t Task3Ramp::getClimbSpeed() {
-  return climbSpeed;
-}
-
-uint16_t Task3Ramp::getDescendSpeed() {
-  return descendSpeed;
-}
-
 unsigned long Task3Ramp::getClimbDuration() {
   return climbDuration;
 }

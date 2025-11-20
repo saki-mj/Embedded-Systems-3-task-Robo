@@ -23,9 +23,6 @@ class Task3Ramp {
     bool taskActive;
     
     // Configuration parameters (can be changed via serial commands)
-    uint16_t approachSpeed;
-    uint16_t climbSpeed;
-    uint16_t descendSpeed;
     unsigned long climbDuration;
     unsigned long descendDuration;
     uint16_t rampDetectionDistance;
@@ -46,18 +43,12 @@ class Task3Ramp {
     void reset();
     
     // Configuration setters
-    void setApproachSpeed(uint16_t speed);
-    void setClimbSpeed(uint16_t speed);
-    void setDescendSpeed(uint16_t speed);
     void setClimbDuration(unsigned long timeMs);
     void setDescendDuration(unsigned long timeMs);
     void setRampDetectionDistance(uint16_t distance);
     void setTopDetectionThreshold(uint16_t threshold);
     
     // Configuration getters
-    uint16_t getApproachSpeed();
-    uint16_t getClimbSpeed();
-    uint16_t getDescendSpeed();
     unsigned long getClimbDuration();
     unsigned long getDescendDuration();
     uint16_t getRampDetectionDistance();

@@ -23,9 +23,6 @@ Task5Unloading::Task5Unloading() {
   ballsUnloaded = 0;
   
   // Default configuration (can be changed via serial commands)
-  navigateSpeed = 70;
-  alignSpeed = 50;
-  unloadSpeed = 40;
   unloadDuration = 3000;  // 3 seconds to unload balls
   alignDuration = 1500;  // 1.5 seconds alignment
   zoneDetectionDistance = 150;  // mm
@@ -147,24 +144,6 @@ int Task5Unloading::getBallsUnloaded() {
 }
 
 // Configuration setters
-void Task5Unloading::setNavigateSpeed(uint16_t speed) {
-  navigateSpeed = speed;
-  Serial.print("T5 Navigate speed set to: ");
-  Serial.println(speed);
-}
-
-void Task5Unloading::setAlignSpeed(uint16_t speed) {
-  alignSpeed = speed;
-  Serial.print("T5 Align speed set to: ");
-  Serial.println(speed);
-}
-
-void Task5Unloading::setUnloadSpeed(uint16_t speed) {
-  unloadSpeed = speed;
-  Serial.print("T5 Unload speed set to: ");
-  Serial.println(speed);
-}
-
 void Task5Unloading::setUnloadDuration(unsigned long timeMs) {
   unloadDuration = timeMs;
   Serial.print("T5 Unload duration set to: ");
@@ -193,18 +172,6 @@ void Task5Unloading::setTargetBallCount(uint16_t count) {
 }
 
 // Configuration getters
-uint16_t Task5Unloading::getNavigateSpeed() {
-  return navigateSpeed;
-}
-
-uint16_t Task5Unloading::getAlignSpeed() {
-  return alignSpeed;
-}
-
-uint16_t Task5Unloading::getUnloadSpeed() {
-  return unloadSpeed;
-}
-
 unsigned long Task5Unloading::getUnloadDuration() {
   return unloadDuration;
 }

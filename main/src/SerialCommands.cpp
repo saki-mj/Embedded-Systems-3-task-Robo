@@ -23,15 +23,35 @@ void processSerialCommand(String command) {
   command.trim();
   command.toUpperCase();
   
-  // Speed Control Commands (SPEED1 to SPEED10)
-  if (command.startsWith("SPEED")) {
-    int level = command.substring(5).toInt();
-    if (level >= 1 && level <= 10) {
-      setSpeedLevel(level);
-      oledDisplay.showStatus("Manual", getCurrentSpeed());
+  // Global Speed Control Commands
+  if (command.startsWith("SETBASESPEED ")) {
+    int speed = command.substring(13).toInt();
+    if (speed >= 0 && speed <= 1023) {
+      baseSpeed = speed;
+      Serial.print("Base speed set to: ");
+      Serial.println(baseSpeed);
+      oledDisplay.showStatus("Base Speed", baseSpeed);
     } else {
-      Serial.println("Invalid speed level. Use SPEED1 to SPEED10.");
+      Serial.println("Invalid speed. Use 0-1023.");
     }
+  }
+  else if (command.startsWith("SETROTATESPEED ")) {
+    int speed = command.substring(15).toInt();
+    if (speed >= 0 && speed <= 1023) {
+      rotateSpeed = speed;
+      Serial.print("Rotate speed set to: ");
+      Serial.println(rotateSpeed);
+      oledDisplay.showStatus("Rotate Speed", rotateSpeed);
+    } else {
+      Serial.println("Invalid speed. Use 0-1023.");
+    }
+  }
+  else if (command == "SHOWSPEEDS") {
+    Serial.print("Base Speed: ");
+    Serial.println(baseSpeed);
+    Serial.print("Rotate Speed: ");
+    Serial.println(rotateSpeed);
+    oledDisplay.show("Speeds", "Base: " + String(baseSpeed), "Rot: " + String(rotateSpeed));
   }
   // Individual Motor Control
   else if (command == "LMF") {
@@ -152,6 +172,58 @@ void processSerialCommand(String command) {
     } else {
       oledDisplay.show("TOF Reading", "Continuous ON");
     }
+  }
+  else if (command == "TOFBACKREAD") {
+    tofSensors.readBack();
+    Serial.print("Back TOF: ");
+    if (tofSensors.isBackValid()) {
+      Serial.print(tofSensors.getBackDistance());
+      Serial.println(" mm");
+    } else {
+      Serial.println("Out of range");
+    }
+    oledDisplay.show("Back TOF", String(tofSensors.getBackDistance()) + " mm");
+  }
+  else if (command == "TOFCALIBRATE") {
+    oledDisplay.show("Calibrating", "TOF Sensors...");
+    tofSensors.calibrate();
+    oledDisplay.show("TOF Calibrated", "Check Serial");
+  }
+  else if (command.startsWith("TOFERRORLEFT ")) {
+    int16_t error = command.substring(13).toInt();
+    tofSensors.setErrorLeft(error);
+    oledDisplay.show("Left TOF Error", String(error) + " mm");
+  }
+  else if (command.startsWith("TOFERRORFRONT ")) {
+    int16_t error = command.substring(14).toInt();
+    tofSensors.setErrorFront(error);
+    oledDisplay.show("Front TOF Error", String(error) + " mm");
+  }
+  else if (command.startsWith("TOFERRORRIGHT ")) {
+    int16_t error = command.substring(14).toInt();
+    tofSensors.setErrorRight(error);
+    oledDisplay.show("Right TOF Error", String(error) + " mm");
+  }
+  else if (command.startsWith("TOFERRORBACK ")) {
+    int16_t error = command.substring(13).toInt();
+    tofSensors.setErrorBack(error);
+    oledDisplay.show("Back TOF Error", String(error) + " mm");
+  }
+  else if (command == "TOFSHOWERRORS") {
+    Serial.println("TOF Sensor Calibration Errors:");
+    Serial.print("  Left:  ");
+    Serial.print(tofSensors.getErrorLeft());
+    Serial.println(" mm");
+    Serial.print("  Front: ");
+    Serial.print(tofSensors.getErrorFront());
+    Serial.println(" mm");
+    Serial.print("  Right: ");
+    Serial.print(tofSensors.getErrorRight());
+    Serial.println(" mm");
+    Serial.print("  Back:  ");
+    Serial.print(tofSensors.getErrorBack());
+    Serial.println(" mm");
+    oledDisplay.show("TOF Errors", "Check Serial");
   }
   else if (command.startsWith("TOFTHRESHOLD ")) {
     int threshold = command.substring(13).toInt();
@@ -287,21 +359,6 @@ void processSerialCommand(String command) {
     uint16_t dist = command.substring(10).toInt();
     task4Barcode.setWallFollowDistance(dist);
     oledDisplay.show("T4 WF Dist", String(dist) + " mm");
-  }
-  else if (command.startsWith("T4BARSPEED ")) {
-    uint16_t speed = command.substring(11).toInt();
-    task4Barcode.setBarcodeSpeed(speed);
-    oledDisplay.show("T4 Bar Speed", String(speed));
-  }
-  else if (command.startsWith("T4APPSPEED ")) {
-    uint16_t speed = command.substring(11).toInt();
-    task4Barcode.setApproachSpeed(speed);
-    oledDisplay.show("T4 App Speed", String(speed));
-  }
-  else if (command.startsWith("T4TURNSPEED ")) {
-    uint16_t speed = command.substring(12).toInt();
-    task4Barcode.setTurnSpeed(speed);
-    oledDisplay.show("T4 Turn Speed", String(speed));
   }
   else if (command.startsWith("T4TURNRDUR ")) {
     unsigned long dur = command.substring(11).toInt();
@@ -481,8 +538,10 @@ void printSerialCommands() {
   Serial.println("\n========================================");
   Serial.println("Serial Commands:");
   Serial.println("========================================");
-  Serial.println("Speed Control:");
-  Serial.println("  SPEED1 to SPEED12");
+  Serial.println("Global Speed Control:");
+  Serial.println("  SETBASESPEED <0-1023> - Set base speed for forward movement");
+  Serial.println("  SETROTATESPEED <0-1023> - Set speed for turning/rotation");
+  Serial.println("  SHOWSPEEDS - Display current speed settings");
   Serial.println();
   Serial.println("Individual Motor Control:");
   Serial.println("  LMF - Left Motor Forward");
@@ -509,8 +568,15 @@ void printSerialCommands() {
   Serial.println("  SETD <value> - Set derivative gain");
   Serial.println();
   Serial.println("TOF Sensors:");
-  Serial.println("  TOFREAD - Read and display TOF distances");
-  Serial.println("  TOFTHRESHOLD <mm> - Set obstacle threshold");
+  Serial.println("  TOFREAD - Toggle continuous reading (all sensors)");
+  Serial.println("  TOFBACKREAD - Read back TOF sensor once");
+  Serial.println("  TOFCALIBRATE - Calibrate all TOF sensors");
+  Serial.println("  TOFERRORLEFT <mm> - Set left TOF error offset");
+  Serial.println("  TOFERRORFRONT <mm> - Set front TOF error offset");
+  Serial.println("  TOFERRORRIGHT <mm> - Set right TOF error offset");
+  Serial.println("  TOFERRORBACK <mm> - Set back TOF error offset");
+  Serial.println("  TOFSHOWERRORS - Display current calibration errors");
+  Serial.println("  TOFTHRESHOLD <mm> - Set obstacle detection threshold");
   Serial.println();
   Serial.println("Color Sensors:");
   Serial.println("  COLORREAD - Read all color sensors (one time)");
@@ -531,15 +597,6 @@ void printSerialCommands() {
   Serial.println("  WFDIST <mm> - Set wall follow target distance (150)");
   Serial.println();
   Serial.println("Task 1 Plantation Configuration:");
-  Serial.print("  T1SEARCHSPD <speed> - Search speed (");
-  Serial.print(task1Plantation.getSearchSpeed());
-  Serial.println(")");
-  Serial.print("  T1FOLLOWSPD <speed> - Follow speed (");
-  Serial.print(task1Plantation.getFollowSpeed());
-  Serial.println(")");
-  Serial.print("  T1TURNSPD <speed> - Turn speed (");
-  Serial.print(task1Plantation.getTurnSpeed());
-  Serial.println(")");
   Serial.print("  T1TURNDUR <ms> - Turn duration for 90° (");
   Serial.print(task1Plantation.getTurnDuration());
   Serial.println(")");
@@ -554,15 +611,6 @@ void printSerialCommands() {
   Serial.println(")");
   Serial.println();
   Serial.println("Task 2 Wall Follow Configuration:");
-  Serial.print("  T2APPSPD <speed> - Approach speed (");
-  Serial.print(task2WallFollow.getApproachSpeed());
-  Serial.println(")");
-  Serial.print("  T2FOLLOWSPD <speed> - Follow speed (");
-  Serial.print(task2WallFollow.getFollowSpeed());
-  Serial.println(")");
-  Serial.print("  T2TURNSPD <speed> - Turn speed (");
-  Serial.print(task2WallFollow.getTurnSpeed());
-  Serial.println(")");
   Serial.print("  T2WALLDIST <mm> - Wall detection distance (");
   Serial.print(task2WallFollow.getWallDetectionDistance());
   Serial.println(")");
@@ -577,15 +625,6 @@ void printSerialCommands() {
   Serial.println(")");
   Serial.println();
   Serial.println("Task 3 Ramp Configuration:");
-  Serial.print("  T3APPSPD <speed> - Approach speed (");
-  Serial.print(task3Ramp.getApproachSpeed());
-  Serial.println(")");
-  Serial.print("  T3CLIMBSPD <speed> - Climb speed (");
-  Serial.print(task3Ramp.getClimbSpeed());
-  Serial.println(")");
-  Serial.print("  T3DESCSPD <speed> - Descend speed (");
-  Serial.print(task3Ramp.getDescendSpeed());
-  Serial.println(")");
   Serial.print("  T3CLIMBDUR <ms> - Climb duration (");
   Serial.print(task3Ramp.getClimbDuration());
   Serial.println(")");
@@ -605,15 +644,6 @@ void printSerialCommands() {
   Serial.println(")");
   Serial.print("  T4WFOLLOW <mm> - Wall following target distance (");
   Serial.print(task4Barcode.getWallFollowDistance());
-  Serial.println(")");
-  Serial.print("  T4BARSPEED <speed> - Barcode reading speed (");
-  Serial.print(task4Barcode.getBarcodeSpeed());
-  Serial.println(")");
-  Serial.print("  T4APPSPEED <speed> - Approach speed (");
-  Serial.print(task4Barcode.getApproachSpeed());
-  Serial.println(")");
-  Serial.print("  T4TURNSPEED <speed> - Turn speed (");
-  Serial.print(task4Barcode.getTurnSpeed());
   Serial.println(")");
   Serial.print("  T4TURNRDUR <ms> - Turn RIGHT duration for 90° (");
   Serial.print(task4Barcode.getTurnRightDuration());
