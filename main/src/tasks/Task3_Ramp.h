@@ -7,6 +7,7 @@
 #define TASK3_RAMP_H
 
 #include <Arduino.h>
+#include "../Gyroscope.h"
 
 enum Task3SubState {
   T3_INIT,
