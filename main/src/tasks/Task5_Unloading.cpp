@@ -157,6 +157,11 @@ Task5Unloading::Task5Unloading() {
   alignDuration         = 1200; // ms of slow backward creep for final align
   zoneDetectionDistance = 150;  // mm threshold for back TOF to detect zone
   targetBallCount       = 1;    // how many items to unload by default
+  
+  // OUT Servo defaults
+  outServoPos0 = 85;   // home/initial position
+  outServoPos1 = 140;  // out yellow balls position
+  outServoPos2 = 40;   // out white balls position
 
   // Sorting / barcode defaults
   barcodeBinary   = "";
@@ -193,6 +198,15 @@ BasketColor Task5Unloading::chooseBasket() const {
 
 void Task5Unloading::init() {
   Serial.println("=== Task 5: Unloading - Initializing ===");
+  
+  // Initialize OUT servo
+  outServo.attach(OUT_SERVO_PIN);
+  outServo.write(outServoPos0);
+  Serial.print("OUT Servo initialized on pin ");
+  Serial.print(OUT_SERVO_PIN);
+  Serial.print(" at position ");
+  Serial.println(outServoPos0);
+  
   currentSubState = T5_INIT;
   subStateStartTime = millis();
   taskActive = false;
@@ -526,3 +540,34 @@ unsigned long Task5Unloading::getUnloadDuration()    { return unloadDuration; }
 unsigned long Task5Unloading::getAlignDuration()     { return alignDuration; }
 uint16_t Task5Unloading::getZoneDetectionDistance()  { return zoneDetectionDistance; }
 uint16_t Task5Unloading::getTargetBallCount()        { return targetBallCount; }
+
+// ---------------- OUT Servo Control ----------------
+
+void Task5Unloading::setOutServoPositions(int pos0, int pos1, int pos2) {
+  outServoPos0 = pos0;
+  outServoPos1 = pos1;
+  outServoPos2 = pos2;
+  Serial.print("OUT Servo positions updated - Home: ");
+  Serial.print(pos0);
+  Serial.print("°, Yellow: ");
+  Serial.print(pos1);
+  Serial.print("°, White: ");
+  Serial.print(pos2);
+  Serial.println("°");
+}
+
+void Task5Unloading::moveOutServoTo(int position) {
+  position = constrain(position, 0, 180);
+  outServo.write(position);
+  Serial.print("OUT Servo moved to: ");
+  Serial.print(position);
+  Serial.println("°");
+}
+
+void Task5Unloading::testOutServo(int angle) {
+  angle = constrain(angle, 0, 180);
+  outServo.write(angle);
+  Serial.print("OUT Servo test: ");
+  Serial.print(angle);
+  Serial.println("°");
+}

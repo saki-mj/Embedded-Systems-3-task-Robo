@@ -15,18 +15,18 @@
 // Pin configuration
 #define BUTTON_PIN 19
 
-// Button detection ranges (analog values)
+// Button detection ranges (analog values with ±100 tolerance)
 #define BUTTON_UP_MIN 0
-#define BUTTON_UP_MAX 50
+#define BUTTON_UP_MAX 183      // 83 ± 100
 
-#define BUTTON_LEFT_MIN 1100
-#define BUTTON_LEFT_MAX 1200
+#define BUTTON_LEFT_MIN 1128
+#define BUTTON_LEFT_MAX 1328   // 1228 ± 100
 
 #define BUTTON_MIDDLE_MIN 1750
 #define BUTTON_MIDDLE_MAX 1850
 
-#define BUTTON_RIGHT_MIN 2600
-#define BUTTON_RIGHT_MAX 2750
+#define BUTTON_RIGHT_MIN 3747
+#define BUTTON_RIGHT_MAX 3947  // 3847 ± 100
 
 #define BUTTON_DOWN_MIN 3750
 #define BUTTON_DOWN_MAX 4020
@@ -52,6 +52,7 @@ class PushButton {
     unsigned long lastDebounceTime;
     unsigned long lastPressTime;
     bool buttonPressed;
+    bool continuousReadingActive;
     
     // Detect which button is pressed based on analog value
     Button detectButton(int analogValue);
@@ -82,6 +83,10 @@ class PushButton {
     
     // Print current button state
     void printState();
+    
+    // Toggle continuous reading mode
+    void toggleContinuousReading();
+    bool isContinuousReadingActive();
 };
 
 // Global instance

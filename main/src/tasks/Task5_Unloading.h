@@ -20,9 +20,10 @@
 #define TASK5_UNLOADING_H
 
 #include <Arduino.h>
+#include <ESP32Servo.h>
 
 // Servo pin definitions
-#define UNLOADING_Servo_PIN 39
+#define OUT_SERVO_PIN 39
 
 // ---------------- Task 5 Sub-States ----------------
 enum Task5SubState {
@@ -51,6 +52,12 @@ class Task5Unloading {
     unsigned long subStateStartTime;
     bool taskActive;
     int  ballsUnloaded;
+    
+    // OUT Servo for Task 5
+    Servo outServo;
+    int outServoPos0;  // OUT servo home/initial position (85°)
+    int outServoPos1;  // OUT servo yellow balls position (140°)
+    int outServoPos2;  // OUT servo white balls position (40°)
 
     // Motion / timing configuration
     unsigned long unloadDuration;
@@ -115,6 +122,14 @@ class Task5Unloading {
     unsigned long getAlignDuration();
     uint16_t getZoneDetectionDistance();
     uint16_t getTargetBallCount();
+    
+    // OUT Servo control
+    void setOutServoPositions(int pos0, int pos1, int pos2);
+    void moveOutServoTo(int position);
+    int getOutServoPos0() { return outServoPos0; }
+    int getOutServoPos1() { return outServoPos1; }
+    int getOutServoPos2() { return outServoPos2; }
+    void testOutServo(int angle);
 };
 
 // Global instance
