@@ -109,8 +109,8 @@ DOWN:   3750-4020 (typical: ~3885)
 - **Arm Servo**: GPIO 35
 - **Gripper Servo**: GPIO 36
 - **Sorting Servo**: GPIO 37
+- **UNLOADING Servo**: GPIO 39
 
----
 
 ## Software Architecture
 
@@ -995,7 +995,7 @@ Buttons:
   Analog: 19
 
 Servos:
-  Arm: 35, Gripper: 36, Sorting: 37
+  Arm: 35, Gripper: 36, Sorting: 37, Unloading 39
 ```
 
 ---
