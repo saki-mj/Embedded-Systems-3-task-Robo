@@ -110,9 +110,9 @@ void Gyroscope::read() {
   gyroY = (gy - gyroOffsetY) / float(GYRO_SENSITIVITY);
   gyroZ = (gz - gyroOffsetZ) / float(GYRO_SENSITIVITY);
 
-  // Compute roll & pitch
-  roll = atan2(accelY, accelZ) * 180.0 / PI;
-  pitch = atan2(-accelX, sqrt(accelY * accelY + accelZ * accelZ)) * 180.0 / PI;
+  // Compute roll & pitch (swapped due to MPU6050 orientation)
+  pitch = atan2(accelY, accelZ) * 180.0 / PI;
+  roll = atan2(-accelX, sqrt(accelY * accelY + accelZ * accelZ)) * 180.0 / PI;
 }
 
 // Get accelerometer readings (in g)
