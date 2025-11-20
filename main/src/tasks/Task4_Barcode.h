@@ -36,6 +36,7 @@ class Task4Barcode {
     unsigned long straightDuration;   // Time for straight movement (ms)
     unsigned long reverseDuration;    // Time for reverse movement (ms)
     uint16_t irWhiteThreshold;        // IR threshold: above=white(1), below=black(0)
+    uint16_t barcodeSpeed;            // Add barcodeSpeed as a member variable
     
     // Barcode reading variables
     int barcodeBits[4];           // Barcode bits read by sensors 6,7,8,9
@@ -77,6 +78,7 @@ class Task4Barcode {
     void setStraightDuration(unsigned long timeMs);
     void setReverseDuration(unsigned long timeMs);
     void setIRWhiteThreshold(uint16_t threshold);
+    void setBarcodeSpeed(uint16_t speed);
     
     // Getters for current values
     uint16_t getWallDetectionDistance();

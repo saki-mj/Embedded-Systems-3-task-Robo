@@ -144,4 +144,10 @@ int getBaseSpeed();
  */
 int getRotateSpeed();
 
+/**
+ * @brief Set current speed
+ * @param speed PWM value (0-1023)
+ */
+void setCurrentSpeed(int speed);
+
 #endif // MOTORS_H

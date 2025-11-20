@@ -12,6 +12,8 @@
 #include "../OLEDDisplay.h"
 #include "BallCollector.h" // for servo positions & testServo()
 
+extern Task5Unloading task5Unloading;
+
 Task5Unloading task5Unloading;
 
 // --- Navigation and Unloading Helpers (auto-generated) ---
@@ -101,7 +103,7 @@ void navigateAndUnload(bool barcodeIsEven, DetectedColor color) {
   }
   setCurrentSpeed(30);
   robotBackward();
-  delay((unsigned long) ( (float) getAlignDuration() ));
+  delay((unsigned long) ( (float) task5Unloading.getAlignDuration() ));
   stopAllMotors();
   if (basket == BASKET_BLUE) {
     Serial.println("Going to BLUE basket (left)");

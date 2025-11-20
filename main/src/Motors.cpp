@@ -181,3 +181,7 @@ int getRotateSpeed() {
   return rotateSpeed;
 }
 
+void setCurrentSpeed(int speed) {
+    setMotorSpeed(speed);
+}
+
