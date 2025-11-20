@@ -159,7 +159,7 @@ void Task1Plantation::execute() {
       t1ReturningAlongLine = false;
       t1IntersectionLatched= false;
 
-      setSpeedLevel(T1_SPEED_LEVEL);   // moderate speed
+      T1_setSpeedLevel(T1_SPEED_LEVEL);   // moderate speed
       robotForward();     // move from yellow start head into arena
 
       // Go to SEARCHING: move forward until IR 3..15 see the white line
