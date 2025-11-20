@@ -13,6 +13,7 @@ PushButton::PushButton() {
   lastDebounceTime = 0;
   lastPressTime = 0;
   buttonPressed = false;
+  continuousReadingActive = false;
 }
 
 void PushButton::begin() {
@@ -110,6 +111,21 @@ void PushButton::printState() {
   Serial.print(lastAnalogValue);
   Serial.print(" | Button: ");
   Serial.println(getButtonName(currentButton));
+}
+
+// Toggle continuous reading mode
+void PushButton::toggleContinuousReading() {
+  continuousReadingActive = !continuousReadingActive;
+  if (continuousReadingActive) {
+    Serial.println("Button Continuous Reading: ON");
+    Serial.println("Format: Analog Value | Detected Button");
+  } else {
+    Serial.println("Button Continuous Reading: OFF");
+  }
+}
+
+bool PushButton::isContinuousReadingActive() {
+  return continuousReadingActive;
 }
 
 // Global initialization function
