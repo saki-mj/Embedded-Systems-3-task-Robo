@@ -18,6 +18,8 @@
 #include "tasks/Task4_Barcode.h"
 #include "tasks/Task5_Unloading.h"
 #include "tasks/BallCollector.h"
+#include "Gyroscope.h"
+#include "LED.h"
 
 void processSerialCommand(String command) {
   command.trim();
@@ -104,6 +106,8 @@ void processSerialCommand(String command) {
     task3Ramp.stop();
     task4Barcode.stop();
     task5Unloading.stop();
+    // Stop ball collector
+    ballCollector.stop();
     // Stop line following
     if (isLineFollowActive()) {
       toggleLineFollow();
@@ -124,9 +128,18 @@ void processSerialCommand(String command) {
     if (tofSensors.isContinuousReadingActive()) {
       tofSensors.toggleContinuousReading();
     }
+    // Stop gyroscope continuous reading
+    if (gyroscope.isContinuousReadingActive()) {
+      gyroscope.toggleContinuousReading();
+    }
+    // Stop button continuous reading
+    if (pushButton.isContinuousReadingActive()) {
+      pushButton.toggleContinuousReading();
+    }
     // Stop all color sensor continuous reading
     colorSensors.stopAllContinuousReading();
     
+    Serial.println("All tasks and operations stopped");
     oledDisplay.show("Robot", "STOPPED", "All Tasks");
   }
   // IR Sensor Reading
@@ -163,6 +176,18 @@ void processSerialCommand(String command) {
     float value = command.substring(5).toFloat();
     setKd(value);
     oledDisplay.show("PD Tuning", "Kd updated");
+  }
+  // Wall Following
+  else if (command == "WALLFOLLOW") {
+    if (wallFollow.isActive()) {
+      wallFollow.stop();
+      Serial.println("Wall Following: STOPPED");
+      oledDisplay.show("Wall Follow", "STOPPED");
+    } else {
+      wallFollow.start();
+      Serial.println("Wall Following: ACTIVE");
+      oledDisplay.show("Wall Follow", "ACTIVE");
+    }
   }
   // TOF Sensors
   else if (command == "TOFREAD") {
@@ -230,6 +255,72 @@ void processSerialCommand(String command) {
     tofSensors.setObstacleThreshold(threshold);
     oledDisplay.show("TOF Threshold", String(threshold) + " mm");
   }
+  // LED Control
+  else if (command == "LED1ON") {
+    led.led1On();
+    Serial.println("LED1: ON");
+    oledDisplay.show("LED1", "ON");
+  }
+  else if (command == "LED1OFF") {
+    led.led1Off();
+    Serial.println("LED1: OFF");
+    oledDisplay.show("LED1", "OFF");
+  }
+  else if (command == "LED2ON") {
+    led.led2On();
+    Serial.println("LED2: ON");
+    oledDisplay.show("LED2", "ON");
+  }
+  else if (command == "LED2OFF") {
+    led.led2Off();
+    Serial.println("LED2: OFF");
+    oledDisplay.show("LED2", "OFF");
+  }
+  else if (command == "LEDON") {
+    led.allOn();
+    Serial.println("All LEDs: ON");
+    oledDisplay.show("All LEDs", "ON");
+  }
+  else if (command == "LEDOFF") {
+    led.allOff();
+    Serial.println("All LEDs: OFF");
+    oledDisplay.show("All LEDs", "OFF");
+  }
+  else if (command.startsWith("LED1BLINK ")) {
+    int times = command.substring(10).toInt();
+    led.led1Blink(times);
+    Serial.print("LED1 blinked ");
+    Serial.print(times);
+    Serial.println(" times");
+  }
+  else if (command.startsWith("LED2BLINK ")) {
+    int times = command.substring(10).toInt();
+    led.led2Blink(times);
+    Serial.print("LED2 blinked ");
+    Serial.print(times);
+    Serial.println(" times");
+  }
+  // Gyroscope
+  else if (command == "GYROREAD") {
+    gyroscope.toggleContinuousReading();
+    if (!gyroscope.isContinuousReadingActive()) {
+      oledDisplay.show("Gyroscope", "Reading OFF");
+    } else {
+      oledDisplay.show("Gyroscope", "Continuous ON");
+    }
+  }
+  else if (command == "GYROCALIBRATE") {
+    oledDisplay.show("Calibrating", "Gyroscope", "Keep Steady!");
+    Serial.println("\n*** KEEP ROBOT ABSOLUTELY STILL ***");
+    Serial.println("*** Gyroscope calibration starting... ***");
+    gyroscope.calibrate();
+    Serial.println("Gyroscope calibration complete!\n");
+    oledDisplay.show("Gyro Calibrated", "Check Serial");
+  }
+  else if (command == "GYROOFFSETS") {
+    gyroscope.printCalibration();
+    oledDisplay.show("Gyro Offsets", "Check Serial");
+  }
   // Color Sensors
   else if (command == "COLORREAD") {
     printColorValues();
@@ -266,7 +357,12 @@ void processSerialCommand(String command) {
   }
   // Push Button
   else if (command == "BUTTONREAD") {
-    pushButton.printState();
+    pushButton.toggleContinuousReading();
+    if (!pushButton.isContinuousReadingActive()) {
+      oledDisplay.show("Button Reading", "OFF");
+    } else {
+      oledDisplay.show("Button Reading", "Continuous ON");
+    }
   }
   // OLED Display
   else if (command == "OLEDCLEAR") {
@@ -525,6 +621,38 @@ void processSerialCommand(String command) {
     int angle = command.substring(11).toInt();
     ballCollector.testServo("SORTING", angle);
   }
+  else if (command.startsWith("CONFIGOUT ")) {
+    int angle = command.substring(10).toInt();
+    task5Unloading.testOutServo(angle);
+  }
+  else if (command.startsWith("T5OUTPOS ")) {
+    // Format: T5OUTPOS pos0 pos1 pos2
+    int space1 = command.indexOf(' ', 9);
+    int space2 = command.indexOf(' ', space1 + 1);
+    if (space1 > 0 && space2 > 0) {
+      int pos0 = command.substring(9, space1).toInt();
+      int pos1 = command.substring(space1 + 1, space2).toInt();
+      int pos2 = command.substring(space2 + 1).toInt();
+      task5Unloading.setOutServoPositions(pos0, pos1, pos2);
+      Serial.print("OUT Servo positions updated - Home: ");
+      Serial.print(pos0);
+      Serial.print("°, Yellow: ");
+      Serial.print(pos1);
+      Serial.print("°, White: ");
+      Serial.print(pos2);
+      Serial.println("°");
+      oledDisplay.show("OUT Servo Pos", String(pos0) + "," + String(pos1) + "," + String(pos2));
+    } else {
+      Serial.print("Current - Home: ");
+      Serial.print(task5Unloading.getOutServoPos0());
+      Serial.print("°, Yellow: ");
+      Serial.print(task5Unloading.getOutServoPos1());
+      Serial.print("°, White: ");
+      Serial.print(task5Unloading.getOutServoPos2());
+      Serial.println("°");
+      Serial.println("Usage: T5OUTPOS <pos0> <pos1> <pos2>");
+    }
+  }
   else if (command.startsWith("BCSERVODELAY ")) {
     unsigned long delay = command.substring(13).toInt();
     ballCollector.setServoMoveDelay(delay);
@@ -598,6 +726,8 @@ void printSerialCommands() {
   Serial.println("  SETP <value> - Set proportional gain");
   Serial.println("  SETD <value> - Set derivative gain");
   Serial.println();
+  Serial.println("Wall Following:");
+  Serial.println("  WALLFOLLOW - Toggle wall following (uses left TOF)");
   Serial.println("TOF Sensors:");
   Serial.println("  TOFREAD - Toggle continuous reading (all sensors)");
   Serial.println("  TOFBACKREAD - Read back TOF sensor once");
@@ -609,6 +739,11 @@ void printSerialCommands() {
   Serial.println("  TOFSHOWERRORS - Display current calibration errors");
   Serial.println("  TOFTHRESHOLD <mm> - Set obstacle detection threshold");
   Serial.println();
+  Serial.println("Gyroscope:");
+  Serial.println("  GYROREAD - Toggle continuous gyroscope reading");
+  Serial.println("  GYROCALIBRATE - Calibrate gyroscope (keep steady)");
+  Serial.println("  GYROOFFSETS - Show calibration offsets");
+  Serial.println();
   Serial.println("Color Sensors:");
   Serial.println("  COLORREAD - Read all color sensors (one time)");
   Serial.println("  COLORSCAN - Scan all channels to find color sensors");
@@ -617,7 +752,17 @@ void printSerialCommands() {
   Serial.println("  COLORBACK - Toggle continuous back sensor (Ch 1)");
   Serial.println();
   Serial.println("Push Button:");
-  Serial.println("  BUTTONREAD - Read current button state");
+  Serial.println("  BUTTONREAD - Toggle continuous button reading (analog + detected button)");
+  Serial.println();
+  Serial.println("External LEDs:");
+  Serial.println("  LED1ON - Turn on LED1 (GPIO 3)");
+  Serial.println("  LED1OFF - Turn off LED1 (GPIO 3)");
+  Serial.println("  LED2ON - Turn on LED2 (GPIO 17)");
+  Serial.println("  LED2OFF - Turn off LED2 (GPIO 17)");
+  Serial.println("  LEDON - Turn on all LEDs");
+  Serial.println("  LEDOFF - Turn off all LEDs");
+  Serial.println("  LED1BLINK <times> - Blink LED1 specified times");
+  Serial.println("  LED2BLINK <times> - Blink LED2 specified times");
   Serial.println();
   Serial.println("OLED Display:");
   Serial.println("  OLEDCLEAR - Clear OLED display");
@@ -706,6 +851,16 @@ void printSerialCommands() {
   Serial.println("    CONFIGARM <angle> - Test arm servo at specific angle");
   Serial.println("    CONFIGGRIP <angle> - Test gripper servo at specific angle");
   Serial.println("    CONFIGSORT <angle> - Test sorting servo at specific angle");
+  Serial.println("    CONFIGOUT <angle> - Test OUT servo at specific angle (Task 5)");
+  Serial.println();
+  Serial.println("  OUT Servo Configuration (Task 5):");
+  Serial.print("    T5OUTPOS <pos0> <pos1> <pos2> - Set OUT servo positions (Home: ");
+  Serial.print(task5Unloading.getOutServoPos0());
+  Serial.print("°, Yellow: ");
+  Serial.print(task5Unloading.getOutServoPos1());
+  Serial.print("°, White: ");
+  Serial.print(task5Unloading.getOutServoPos2());
+  Serial.println("°)");
   Serial.println();
   Serial.println("State Machine:");
   Serial.println("  START - Enter IDLE state (ready to run)");
