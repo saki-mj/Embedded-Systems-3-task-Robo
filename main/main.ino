@@ -12,6 +12,7 @@ int baseSpeed = 70;    // Base speed for forward movement (PWM: 0-1023)
 int rotateSpeed = 50;   // Speed for turning/rotation (PWM: 0-1023)
 =======
 int rotateSpeed = 60;   // Speed for turning/rotation (PWM: 0-1023)
+>>>>>>> Stashed changes
 #include "src/IRReading.h"
 #include "src/LineFollow.h"
 #include "src/WallFollow.h"
@@ -27,6 +28,11 @@ int rotateSpeed = 60;   // Speed for turning/rotation (PWM: 0-1023)
 #include "src/tasks/Task4_Barcode.h"
 #include "src/tasks/Task5_Unloading.h"
 #include "src/tasks/BallCollector.h"
+<<<<<<< Updated upstream
+=======
+#include "src/Gyroscope.h"
+#include "src/LED.h"
+>>>>>>> Stashed changes
 
 // -------------------------------------------------------------------------
 // Activity Tracking for QR Code Display
@@ -69,6 +75,9 @@ void setup() {
   
   // Initialize push button
   initPushButton();
+  
+  // Initialize external LEDs
+  initLED();
   
   // Initialize line following
   initLineFollow();
@@ -114,6 +123,13 @@ void loop() {
   // Handle push button controls
   handlePushButtonControls();
   
+  // Update OLED with real-time speed (every 500ms when idle)
+  static unsigned long lastSpeedUpdate = 0;
+  if (millis() - lastSpeedUpdate > 500 && stateMachine.getState() == STATE_IDLE) {
+    lastSpeedUpdate = millis();
+    oledDisplay.showStatus("Idle", baseSpeed);
+  }
+  
   // Check for serial commands
   if (Serial.available() > 0) {
     String command = Serial.readStringUntil('\n');
@@ -148,14 +164,29 @@ void loop() {
       break;
     case STATE_TASK4_BARCODE:
       updateActivity(); // Reset timer when task is active
+      led.led1On(); // LED1 on during Task 4
       task4Barcode.execute();
+      // Check if Task 4 is complete and auto-start Task 5
+      if (task4Barcode.isCompleted()) {
+        Serial.println("*** Task 4 Complete - Auto-starting Task 5 ***");
+        stateMachine.setState(STATE_TASK5_UNLOADING);
+        task5Unloading.start();
+        oledDisplay.show("Task 4 Done", "Starting Task 5");
+        delay(1000);
+      }
       break;
     case STATE_TASK5_UNLOADING:
       updateActivity(); // Reset timer when task is active
+      led.led1On(); // LED1 on during Task 5
       task5Unloading.execute();
+      // Turn off LED when Task 5 is complete
+      if (task5Unloading.isCompleted()) {
+        led.led1Off();
+      }
       break;
     default:
       // For STANDBY, IDLE, and EMERGENCY_STOP states, no task execution
+      led.led1Off(); // Turn off LED when not in Task 4 or 5
       break;
   }
   
@@ -169,6 +200,19 @@ void loop() {
       lastOLEDUpdate = millis();
       extern float lastError;
       oledDisplay.showLineFollowing(true, lastError);
+    }
+  }
+  // Execute wall following if active
+  else if (wallFollow.isActive()) {
+    readTOFSensors();
+    uint16_t leftDist = tofSensors.getLeftDistance();
+    wallFollow.executeWallFollow(leftDist);
+    
+    // Update OLED periodically during wall following
+    static unsigned long lastWallOLEDUpdate = 0;
+    if (millis() - lastWallOLEDUpdate > 500) {
+      lastWallOLEDUpdate = millis();
+      oledDisplay.show("Wall Follow", "Active", "L: " + String(leftDist) + "mm");
     }
   }
   // If raw IR reading mode is active, continuously print raw IR values
@@ -215,6 +259,17 @@ void loop() {
     Serial.print(" Color="); Serial.println(colorSensors.getColorName(colorSensors.getBackColor()));
     delay(200);
   }
+  // If gyroscope continuous reading is active, print values
+  else if (gyroscope.isContinuousReadingActive()) {
+    gyroscope.read();
+    gyroscope.printValues();
+    delay(100);
+  }
+  // If button continuous reading is active, print values
+  else if (pushButton.isContinuousReadingActive()) {
+    pushButton.printState();
+    delay(100);
+  }
 }
 
 // -------------------------------------------------------------------------
@@ -222,31 +277,52 @@ void loop() {
 // -------------------------------------------------------------------------
 
 void handlePushButtonControls() {
-  // DOWN button - Emergency Stop
+  // DOWN button - No function (disabled)
   if (pushButton.wasPressed(BTN_DOWN)) {
+    // Button press detected but no action taken
     updateActivity(); // Reset timer on button press
-    Serial.println("\n*** EMERGENCY STOP - Button Pressed ***");
-    stateMachine.emergencyStop();
-    // Stop all motors
+  }
+  
+  // LEFT button - Execute Task 4 then Task 5
+  if (pushButton.wasPressed(BTN_LEFT)) {
+    updateActivity(); // Reset timer on button press
+    RobotState currentState = stateMachine.getState();
+    
+    // Only allow if not in emergency or standby
+    if (currentState == STATE_EMERGENCY_STOP || currentState == STATE_STANDBY) {
+      Serial.println("Cannot start tasks - Resume or complete initialization first");
+      oledDisplay.show("Cannot Start", "Resume First");
+      delay(1000);
+      return;
+    }
+    
+    // SAFETY: Stop motors first
     stopAllMotors();
-    // Stop all tasks
+    
+    // Stop line following if active
+    if (isLineFollowActive()) {
+      toggleLineFollow();
+    }
+    
+    // Stop wall following if active
+    if (wallFollow.isActive()) {
+      wallFollow.stop();
+    }
+    
+    // Stop all current tasks
     task1Plantation.stop();
     task2WallFollow.stop();
     task3Ramp.stop();
     task4Barcode.stop();
     task5Unloading.stop();
-    // Stop ball collector
-    ballCollector.stop();
-    // Stop line following
-    if (isLineFollowActive()) {
-      toggleLineFollow();
-    }
-    // Stop wall following
-    if (wallFollow.isActive()) {
-      wallFollow.stop();
-    }
-    oledDisplay.show("EMERGENCY", "STOP", "BTN DOWN");
-    delay(1000);
+    
+    // Start Task 4 (Barcode)
+    Serial.println("*** LEFT Button: Starting Task 4 (Barcode) ***");
+    stateMachine.setState(STATE_TASK4_BARCODE);
+    task4Barcode.start();
+    led.led1On(); // Turn on LED1 for Task 4 & 5
+    oledDisplay.show("LEFT Button", "Task 4", "Barcode");
+    delay(1500);
   }
   
   // RIGHT button - Change Tasks (cycle through tasks)
