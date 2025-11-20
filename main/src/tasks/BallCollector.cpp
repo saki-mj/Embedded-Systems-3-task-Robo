@@ -24,10 +24,12 @@ BallCollector::BallCollector() {
   colorThreshold = 1000;
   
   // Default servo positions (PLACEHOLDER VALUES - TO BE CALIBRATED)
-  armPos0 = 0;        // Arm home position
-  armPos1 = 90;       // Arm pickup position
+  armPos0 = 125;      // Arm home position
+  armPos1 = 22;       // Arm pickup position
   gripperPos0 = 0;    // Gripper open
-  gripperPos1 = 90;   // Gripper closed
+  gripperPos1 = 180;  // Gripper closed
+  gripperInitialPos = 130;  // Gripper initial position
+  gripperDropPos = 150;     // Gripper drop position
   sortingPos0 = 45;   // Sorting yellow position
   sortingPos1 = 92;   // Sorting initial/home position
   sortingPos2 = 135;  // Sorting white position
@@ -73,8 +75,12 @@ bool BallCollector::collectingBall() {
     oledDisplay.show("Collecting", "Ball...");
   }
   
-  // Step 1: Move arm to pickup position
+  // Step 1: Move gripper to initial position, then move arm to pickup position
   Serial.println("Step 1: Moving arm to pickup position...");
+  oledDisplay.show("Step 1", "Gripper Init");
+  moveGripperTo(gripperInitialPos);
+  delay(servoMoveDelay);  // Allow gripper to reach initial position
+  
   oledDisplay.show("Step 1", "Arm Moving");
   moveArmTo(armPos1);
   delay(servoMoveDelay);  // Allow servo to reach position
@@ -91,11 +97,21 @@ bool BallCollector::collectingBall() {
   moveArmTo(armPos0);
   delay(servoMoveDelay);  // Allow servo to reach position
   
-  // Step 4: Open gripper to drop ball into sorting area
+  // Step 4: Move gripper to drop position to drop ball into sorting area
   Serial.println("Step 4: Opening gripper to drop ball...");
   oledDisplay.show("Step 4", "Dropping Ball");
-  moveGripperTo(gripperPos0);
-  delay(servoMoveDelay);  // Allow gripper to open
+  moveGripperTo(gripperDropPos);
+  delay(servoMoveDelay);  // Allow gripper to reach drop position
+  
+  // Wait 3 seconds at drop position
+  Serial.println("Waiting 3 seconds at drop position...");
+  delay(3000);
+  
+  // Return gripper to initial position
+  Serial.println("Returning gripper to initial position...");
+  oledDisplay.show("Step 4", "Gripper Init");
+  moveGripperTo(gripperInitialPos);
+  delay(servoMoveDelay);  // Allow gripper to reach initial position
   
   // Step 5: Wait before color detection
   Serial.println("Step 5: Waiting before color detection...");
@@ -108,7 +124,10 @@ bool BallCollector::collectingBall() {
   colorSensors.readTopSensor();
   DetectedColor ballColor = colorSensors.getTopColor();
   String colorName = colorSensors.getColorName(ballColor);
-  
+
+  // store last detected color so other modules (Task5) can use it
+  lastDetectedColor = ballColor;
+
   Serial.print("Detected color: ");
   Serial.println(colorName);
   Serial.print("RGB values - R: ");
@@ -196,7 +215,7 @@ void BallCollector::stop() {
   
   // Return servos to initial positions
   armServo.write(armPos0);
-  gripperServo.write(gripperPos0);
+  gripperServo.write(gripperInitialPos);
   sortingServo.write(sortingPos1);
   
   Serial.println("Servos returned to initial positions");
@@ -234,13 +253,19 @@ void BallCollector::setArmPositions(int pos0, int pos1) {
   Serial.println(pos1);
 }
 
-void BallCollector::setGripperPositions(int pos0, int pos1) {
+void BallCollector::setGripperPositions(int pos0, int pos1, int initialPos, int dropPos) {
   gripperPos0 = pos0;
   gripperPos1 = pos1;
+  gripperInitialPos = initialPos;
+  gripperDropPos = dropPos;
   Serial.print("Ball Collector: Gripper positions set - Open: ");
   Serial.print(pos0);
   Serial.print(", Closed: ");
-  Serial.println(pos1);
+  Serial.print(pos1);
+  Serial.print(", Initial: ");
+  Serial.print(initialPos);
+  Serial.print(", Drop: ");
+  Serial.println(dropPos);
 }
 
 void BallCollector::setSortingPositions(int pos0, int pos1, int pos2) {

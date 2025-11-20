@@ -23,15 +23,35 @@ void processSerialCommand(String command) {
   command.trim();
   command.toUpperCase();
   
-  // Speed Control Commands (SPEED1 to SPEED10)
-  if (command.startsWith("SPEED")) {
-    int level = command.substring(5).toInt();
-    if (level >= 1 && level <= 10) {
-      setSpeedLevel(level);
-      oledDisplay.showStatus("Manual", getCurrentSpeed());
+  // Global Speed Control Commands
+  if (command.startsWith("SETBASESPEED ")) {
+    int speed = command.substring(13).toInt();
+    if (speed >= 0 && speed <= 1023) {
+      baseSpeed = speed;
+      Serial.print("Base speed set to: ");
+      Serial.println(baseSpeed);
+      oledDisplay.showStatus("Base Speed", baseSpeed);
     } else {
-      Serial.println("Invalid speed level. Use SPEED1 to SPEED10.");
+      Serial.println("Invalid speed. Use 0-1023.");
     }
+  }
+  else if (command.startsWith("SETROTATESPEED ")) {
+    int speed = command.substring(15).toInt();
+    if (speed >= 0 && speed <= 1023) {
+      rotateSpeed = speed;
+      Serial.print("Rotate speed set to: ");
+      Serial.println(rotateSpeed);
+      oledDisplay.showStatus("Rotate Speed", rotateSpeed);
+    } else {
+      Serial.println("Invalid speed. Use 0-1023.");
+    }
+  }
+  else if (command == "SHOWSPEEDS") {
+    Serial.print("Base Speed: ");
+    Serial.println(baseSpeed);
+    Serial.print("Rotate Speed: ");
+    Serial.println(rotateSpeed);
+    oledDisplay.show("Speeds", "Base: " + String(baseSpeed), "Rot: " + String(rotateSpeed));
   }
   // Individual Motor Control
   else if (command == "LMF") {
@@ -152,6 +172,58 @@ void processSerialCommand(String command) {
     } else {
       oledDisplay.show("TOF Reading", "Continuous ON");
     }
+  }
+  else if (command == "TOFBACKREAD") {
+    tofSensors.readBack();
+    Serial.print("Back TOF: ");
+    if (tofSensors.isBackValid()) {
+      Serial.print(tofSensors.getBackDistance());
+      Serial.println(" mm");
+    } else {
+      Serial.println("Out of range");
+    }
+    oledDisplay.show("Back TOF", String(tofSensors.getBackDistance()) + " mm");
+  }
+  else if (command == "TOFCALIBRATE") {
+    oledDisplay.show("Calibrating", "TOF Sensors...");
+    tofSensors.calibrate();
+    oledDisplay.show("TOF Calibrated", "Check Serial");
+  }
+  else if (command.startsWith("TOFERRORLEFT ")) {
+    int16_t error = command.substring(13).toInt();
+    tofSensors.setErrorLeft(error);
+    oledDisplay.show("Left TOF Error", String(error) + " mm");
+  }
+  else if (command.startsWith("TOFERRORFRONT ")) {
+    int16_t error = command.substring(14).toInt();
+    tofSensors.setErrorFront(error);
+    oledDisplay.show("Front TOF Error", String(error) + " mm");
+  }
+  else if (command.startsWith("TOFERRORRIGHT ")) {
+    int16_t error = command.substring(14).toInt();
+    tofSensors.setErrorRight(error);
+    oledDisplay.show("Right TOF Error", String(error) + " mm");
+  }
+  else if (command.startsWith("TOFERRORBACK ")) {
+    int16_t error = command.substring(13).toInt();
+    tofSensors.setErrorBack(error);
+    oledDisplay.show("Back TOF Error", String(error) + " mm");
+  }
+  else if (command == "TOFSHOWERRORS") {
+    Serial.println("TOF Sensor Calibration Errors:");
+    Serial.print("  Left:  ");
+    Serial.print(tofSensors.getErrorLeft());
+    Serial.println(" mm");
+    Serial.print("  Front: ");
+    Serial.print(tofSensors.getErrorFront());
+    Serial.println(" mm");
+    Serial.print("  Right: ");
+    Serial.print(tofSensors.getErrorRight());
+    Serial.println(" mm");
+    Serial.print("  Back:  ");
+    Serial.print(tofSensors.getErrorBack());
+    Serial.println(" mm");
+    oledDisplay.show("TOF Errors", "Check Serial");
   }
   else if (command.startsWith("TOFTHRESHOLD ")) {
     int threshold = command.substring(13).toInt();
@@ -288,21 +360,6 @@ void processSerialCommand(String command) {
     task4Barcode.setWallFollowDistance(dist);
     oledDisplay.show("T4 WF Dist", String(dist) + " mm");
   }
-  else if (command.startsWith("T4BARSPEED ")) {
-    uint16_t speed = command.substring(11).toInt();
-    task4Barcode.setBarcodeSpeed(speed);
-    oledDisplay.show("T4 Bar Speed", String(speed));
-  }
-  else if (command.startsWith("T4APPSPEED ")) {
-    uint16_t speed = command.substring(11).toInt();
-    task4Barcode.setApproachSpeed(speed);
-    oledDisplay.show("T4 App Speed", String(speed));
-  }
-  else if (command.startsWith("T4TURNSPEED ")) {
-    uint16_t speed = command.substring(12).toInt();
-    task4Barcode.setTurnSpeed(speed);
-    oledDisplay.show("T4 Turn Speed", String(speed));
-  }
   else if (command.startsWith("T4TURNRDUR ")) {
     unsigned long dur = command.substring(11).toInt();
     task4Barcode.setTurnRightDuration(dur);
@@ -327,6 +384,40 @@ void processSerialCommand(String command) {
     uint16_t thresh = command.substring(11).toInt();
     task4Barcode.setIRWhiteThreshold(thresh);
     oledDisplay.show("T4 IR Thresh", String(thresh));
+  }
+  // Task 5 Unloading: manual barcode and quality
+  else if (command.startsWith("T5BARCODEBIN ")) {
+    String bin = command.substring(13);
+    task5Unloading.setBarcodeBinary(bin);
+    oledDisplay.show("T5 Barcode", bin);
+  }
+  else if (command.startsWith("T5BARCODEVAL ")) {
+    uint16_t val = command.substring(13).toInt();
+    task5Unloading.setBarcodeValue(val);
+    oledDisplay.show("T5 Barcode", String(val));
+  }
+  else if (command.startsWith("T5QUALITY ")) {
+    String q = command.substring(9);
+    q.trim();
+    q.toUpperCase();
+    if (q == "GOOD") task5Unloading.setPotatoQuality(POTATO_GOOD);
+    else if (q == "BAD") task5Unloading.setPotatoQuality(POTATO_BAD);
+    else Serial.println("T5QUALITY must be GOOD or BAD");
+  }
+  // --- Custom: Odd/Even Barcode Command for Task 5 ---
+  else if (command == "ODD") {
+    task5Unloading.setBarcodeValue(1); // Odd barcode value
+    task5Unloading.setPotatoQuality(POTATO_GOOD); // Default to GOOD, or let user set
+    task5Unloading.start();
+    Serial.println("Task 5: Started with ODD barcode value (1)");
+    oledDisplay.show("T5 Barcode", "ODD (1)", "Started");
+  }
+  else if (command == "EVEN") {
+    task5Unloading.setBarcodeValue(0); // Even barcode value
+    task5Unloading.setPotatoQuality(POTATO_GOOD); // Default to GOOD, or let user set
+    task5Unloading.start();
+    Serial.println("Task 5: Started with EVEN barcode value (0)");
+    oledDisplay.show("T5 Barcode", "EVEN (0)", "Started");
   }
   // Ball Collector Commands
   else if (command == "BALLCOLLECT") {
@@ -357,25 +448,41 @@ void processSerialCommand(String command) {
     }
   }
   else if (command.startsWith("BCGRIPPOS ")) {
-    // Format: BCGRIPPOS pos0 pos1
-    int spaceIndex = command.indexOf(' ', 10);
-    if (spaceIndex > 0) {
-      int pos0 = command.substring(10, spaceIndex).toInt();
-      int pos1 = command.substring(spaceIndex + 1).toInt();
-      ballCollector.setGripperPositions(pos0, pos1);
+    // Format: BCGRIPPOS pos0 pos1 initialPos dropPos
+    String params = command.substring(10);
+    params.trim();
+    
+    int firstSpace = params.indexOf(' ');
+    int secondSpace = params.indexOf(' ', firstSpace + 1);
+    int thirdSpace = params.indexOf(' ', secondSpace + 1);
+    
+    if (firstSpace > 0 && secondSpace > 0 && thirdSpace > 0) {
+      int pos0 = params.substring(0, firstSpace).toInt();
+      int pos1 = params.substring(firstSpace + 1, secondSpace).toInt();
+      int initialPos = params.substring(secondSpace + 1, thirdSpace).toInt();
+      int dropPos = params.substring(thirdSpace + 1).toInt();
+      ballCollector.setGripperPositions(pos0, pos1, initialPos, dropPos);
       Serial.print("Gripper positions updated - Open: ");
       Serial.print(pos0);
       Serial.print("°, Closed: ");
       Serial.print(pos1);
+      Serial.print("°, Initial: ");
+      Serial.print(initialPos);
+      Serial.print("°, Drop: ");
+      Serial.print(dropPos);
       Serial.println("°");
-      oledDisplay.show("Grip Pos", String(pos0) + "," + String(pos1));
+      oledDisplay.show("Grip Pos", String(pos0) + "," + String(pos1) + "," + String(initialPos) + "," + String(dropPos));
     } else {
       Serial.print("Current - Open: ");
       Serial.print(ballCollector.getGripperPos0());
       Serial.print("°, Closed: ");
       Serial.print(ballCollector.getGripperPos1());
+      Serial.print("°, Initial: ");
+      Serial.print(ballCollector.getGripperInitialPos());
+      Serial.print("°, Drop: ");
+      Serial.print(ballCollector.getGripperDropPos());
       Serial.println("°");
-      Serial.println("Usage: BCGRIPPOS <pos0> <pos1>");
+      Serial.println("Usage: BCGRIPPOS <pos0> <pos1> <initialPos> <dropPos>");
     }
   }
   else if (command.startsWith("BCSORTPOS ")) {
@@ -462,8 +569,10 @@ void printSerialCommands() {
   Serial.println("\n========================================");
   Serial.println("Serial Commands:");
   Serial.println("========================================");
-  Serial.println("Speed Control:");
-  Serial.println("  SPEED1 to SPEED12");
+  Serial.println("Global Speed Control:");
+  Serial.println("  SETBASESPEED <0-1023> - Set base speed for forward movement");
+  Serial.println("  SETROTATESPEED <0-1023> - Set speed for turning/rotation");
+  Serial.println("  SHOWSPEEDS - Display current speed settings");
   Serial.println();
   Serial.println("Individual Motor Control:");
   Serial.println("  LMF - Left Motor Forward");
@@ -490,8 +599,15 @@ void printSerialCommands() {
   Serial.println("  SETD <value> - Set derivative gain");
   Serial.println();
   Serial.println("TOF Sensors:");
-  Serial.println("  TOFREAD - Read and display TOF distances");
-  Serial.println("  TOFTHRESHOLD <mm> - Set obstacle threshold");
+  Serial.println("  TOFREAD - Toggle continuous reading (all sensors)");
+  Serial.println("  TOFBACKREAD - Read back TOF sensor once");
+  Serial.println("  TOFCALIBRATE - Calibrate all TOF sensors");
+  Serial.println("  TOFERRORLEFT <mm> - Set left TOF error offset");
+  Serial.println("  TOFERRORFRONT <mm> - Set front TOF error offset");
+  Serial.println("  TOFERRORRIGHT <mm> - Set right TOF error offset");
+  Serial.println("  TOFERRORBACK <mm> - Set back TOF error offset");
+  Serial.println("  TOFSHOWERRORS - Display current calibration errors");
+  Serial.println("  TOFTHRESHOLD <mm> - Set obstacle detection threshold");
   Serial.println();
   Serial.println("Color Sensors:");
   Serial.println("  COLORREAD - Read all color sensors (one time)");
@@ -512,15 +628,6 @@ void printSerialCommands() {
   Serial.println("  WFDIST <mm> - Set wall follow target distance (150)");
   Serial.println();
   Serial.println("Task 1 Plantation Configuration:");
-  Serial.print("  T1SEARCHSPD <speed> - Search speed (");
-  Serial.print(task1Plantation.getSearchSpeed());
-  Serial.println(")");
-  Serial.print("  T1FOLLOWSPD <speed> - Follow speed (");
-  Serial.print(task1Plantation.getFollowSpeed());
-  Serial.println(")");
-  Serial.print("  T1TURNSPD <speed> - Turn speed (");
-  Serial.print(task1Plantation.getTurnSpeed());
-  Serial.println(")");
   Serial.print("  T1TURNDUR <ms> - Turn duration for 90° (");
   Serial.print(task1Plantation.getTurnDuration());
   Serial.println(")");
@@ -535,15 +642,6 @@ void printSerialCommands() {
   Serial.println(")");
   Serial.println();
   Serial.println("Task 2 Wall Follow Configuration:");
-  Serial.print("  T2APPSPD <speed> - Approach speed (");
-  Serial.print(task2WallFollow.getApproachSpeed());
-  Serial.println(")");
-  Serial.print("  T2FOLLOWSPD <speed> - Follow speed (");
-  Serial.print(task2WallFollow.getFollowSpeed());
-  Serial.println(")");
-  Serial.print("  T2TURNSPD <speed> - Turn speed (");
-  Serial.print(task2WallFollow.getTurnSpeed());
-  Serial.println(")");
   Serial.print("  T2WALLDIST <mm> - Wall detection distance (");
   Serial.print(task2WallFollow.getWallDetectionDistance());
   Serial.println(")");
@@ -558,15 +656,6 @@ void printSerialCommands() {
   Serial.println(")");
   Serial.println();
   Serial.println("Task 3 Ramp Configuration:");
-  Serial.print("  T3APPSPD <speed> - Approach speed (");
-  Serial.print(task3Ramp.getApproachSpeed());
-  Serial.println(")");
-  Serial.print("  T3CLIMBSPD <speed> - Climb speed (");
-  Serial.print(task3Ramp.getClimbSpeed());
-  Serial.println(")");
-  Serial.print("  T3DESCSPD <speed> - Descend speed (");
-  Serial.print(task3Ramp.getDescendSpeed());
-  Serial.println(")");
   Serial.print("  T3CLIMBDUR <ms> - Climb duration (");
   Serial.print(task3Ramp.getClimbDuration());
   Serial.println(")");
@@ -587,15 +676,6 @@ void printSerialCommands() {
   Serial.print("  T4WFOLLOW <mm> - Wall following target distance (");
   Serial.print(task4Barcode.getWallFollowDistance());
   Serial.println(")");
-  Serial.print("  T4BARSPEED <speed> - Barcode reading speed (");
-  Serial.print(task4Barcode.getBarcodeSpeed());
-  Serial.println(")");
-  Serial.print("  T4APPSPEED <speed> - Approach speed (");
-  Serial.print(task4Barcode.getApproachSpeed());
-  Serial.println(")");
-  Serial.print("  T4TURNSPEED <speed> - Turn speed (");
-  Serial.print(task4Barcode.getTurnSpeed());
-  Serial.println(")");
   Serial.print("  T4TURNRDUR <ms> - Turn RIGHT duration for 90° (");
   Serial.print(task4Barcode.getTurnRightDuration());
   Serial.println(")");
@@ -612,46 +692,20 @@ void printSerialCommands() {
   Serial.print(task4Barcode.getIRWhiteThreshold());
   Serial.println(")");
   Serial.println();
+  Serial.println("Task 5 Unloading Configuration:");
+  Serial.println("  T5BARCODEBIN <bin> - Set barcode as binary string (e.g. 1010)");
+  Serial.println("  T5BARCODEVAL <val> - Set barcode as integer value (e.g. 10)");
+  Serial.println("  T5QUALITY <GOOD|BAD> - Set potato/ball quality");
+  Serial.println("  ODD - Start Task 5 with ODD barcode value (1)");
+  Serial.println("  EVEN - Start Task 5 with EVEN barcode value (0)");
+  Serial.println();
   Serial.println("Ball Collector:");
   Serial.println("  BALLCOLLECT - Execute ball collection sequence");
-  Serial.println();
-  Serial.println("  Servo Position Configuration:");
-  Serial.print("    BCARMPOS <pos0> <pos1> - Set arm positions (Current: ");
-  Serial.print(ballCollector.getArmPos0());
-  Serial.print("°, ");
-  Serial.print(ballCollector.getArmPos1());
-  Serial.println("°)");
-  Serial.print("    BCGRIPPOS <pos0> <pos1> - Set gripper positions (Current: ");
-  Serial.print(ballCollector.getGripperPos0());
-  Serial.print("°, ");
-  Serial.print(ballCollector.getGripperPos1());
-  Serial.println("°)");
-  Serial.print("    BCSORTPOS <pos0> <pos1> <pos2> - Set sorting positions (Current: ");
-  Serial.print(ballCollector.getSortingPos0());
-  Serial.print("°, ");
-  Serial.print(ballCollector.getSortingPos1());
-  Serial.print("°, ");
-  Serial.print(ballCollector.getSortingPos2());
-  Serial.println("°)");
   Serial.println();
   Serial.println("  Individual Servo Testing (0-180°):");
   Serial.println("    CONFIGARM <angle> - Test arm servo at specific angle");
   Serial.println("    CONFIGGRIP <angle> - Test gripper servo at specific angle");
   Serial.println("    CONFIGSORT <angle> - Test sorting servo at specific angle");
-  Serial.println();
-  Serial.println("  Timing Configuration (milliseconds):");
-  Serial.print("    BCSERVODELAY <ms> - Servo movement delay (Current: ");
-  Serial.print(ballCollector.getServoMoveDelay());
-  Serial.println(" ms)");
-  Serial.print("    BCCOLORDELAY <ms> - Color detection delay (Current: ");
-  Serial.print(ballCollector.getColorDetectDelay());
-  Serial.println(" ms)");
-  Serial.print("    BCSORTDELAY <ms> - Sorting position delay (Current: ");
-  Serial.print(ballCollector.getSortingDelay());
-  Serial.println(" ms)");
-  Serial.print("    BCDONEDELAY <ms> - Completion delay before DONE (Current: ");
-  Serial.print(ballCollector.getCompletionDelay());
-  Serial.println(" ms)");
   Serial.println();
   Serial.println("State Machine:");
   Serial.println("  START - Enter IDLE state (ready to run)");

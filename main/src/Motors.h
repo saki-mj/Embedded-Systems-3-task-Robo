@@ -28,15 +28,11 @@ const int STBY = 7;   // Standby Pin (Active HIGH)
 const int maxSpeed = 1023; // 10-bit resolution (0 to 1023)
 const int freq = 30000;    // PWM frequency in Hz (30 kHz)
 
-// --- Speed Settings ---
-const int minSpeedPWM = 25;    // Minimum PWM value (speed level 1)
-const int maxSpeedPWM = 1023;  // Maximum PWM value (10-bit)
-const int speedLevels = 12;    // Number of speed levels (1-12)
-
 // -------------------------------------------------------------------------
-// Global Variables
+// Global Speed Variables (defined in main.ino)
 // -------------------------------------------------------------------------
-extern int currentSpeed;
+extern int baseSpeed;     // Base speed for forward movement
+extern int rotateSpeed;   // Speed for turning/rotation
 
 // -------------------------------------------------------------------------
 // Motor Control Functions
@@ -119,16 +115,10 @@ void stopAllMotors();
 // -------------------------------------------------------------------------
 
 /**
- * @brief Set speed level (1-12)
- * @param level Speed level from 1 to 12
- */
-void setSpeedLevel(int level);
-
-/**
- * @brief Set current speed directly (for advanced control)
+ * @brief Set motor speed directly (for advanced control)
  * @param speed PWM value (0-1023)
  */
-void setCurrentSpeed(int speed);
+void setMotorSpeed(int speed);
 
 /**
  * @brief Set left motor speed independently (for wall following, etc.)
@@ -143,16 +133,21 @@ void setLeftMotorSpeed(int speed);
 void setRightMotorSpeed(int speed);
 
 /**
- * @brief Get current speed value in PWM units (0-1023)
- * @return Current speed value
+ * @brief Get base speed value
+ * @return Base speed value
  */
-int getCurrentSpeed();
+int getBaseSpeed();
 
 /**
- * @brief Map speed level (1-12) to PWM value
- * @param level Speed level from 1 to 12
- * @return PWM value
+ * @brief Get rotate speed value
+ * @return Rotate speed value
  */
-int mapSpeedLevelToPWM(int level);
+int getRotateSpeed();
+
+/**
+ * @brief Set current speed
+ * @param speed PWM value (0-1023)
+ */
+void setCurrentSpeed(int speed);
 
 #endif // MOTORS_H

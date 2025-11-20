@@ -7,7 +7,7 @@
 
 #include <Arduino.h>
 #include <ESP32Servo.h>
-
+#include "../ColorSensors.h"
 // Servo pin definitions
 #define ARM_SERVO_PIN 35
 #define GRIPPER_SERVO_PIN 36
@@ -34,6 +34,8 @@ private:
   int armPos1;        // Arm pickup position
   int gripperPos0;    // Gripper open
   int gripperPos1;    // Gripper closed
+  int gripperInitialPos;  // Gripper initial position (before arm moves)
+  int gripperDropPos;     // Gripper drop position (after arm returns)
   int sortingPos0;    // Sorting yellow position
   int sortingPos1;    // Sorting initial/home position
   int sortingPos2;    // Sorting white position
@@ -43,6 +45,9 @@ private:
   unsigned long colorDetectDelay;     // Delay before color detection
   unsigned long sortingDelay;         // Delay at sorting position
   unsigned long completionDelay;      // Delay after sorting before DONE
+
+  // --- Added for Task5: last detected color ---
+  DetectedColor lastDetectedColor;
   
 public:
   BallCollector();
@@ -73,7 +78,7 @@ public:
   
   // Set servo positions (for calibration)
   void setArmPositions(int pos0, int pos1);
-  void setGripperPositions(int pos0, int pos1);
+  void setGripperPositions(int pos0, int pos1, int initialPos, int dropPos);
   void setSortingPositions(int pos0, int pos1, int pos2);
   
   // Servo control methods
@@ -86,6 +91,8 @@ public:
   int getArmPos1() { return armPos1; }
   int getGripperPos0() { return gripperPos0; }
   int getGripperPos1() { return gripperPos1; }
+  int getGripperInitialPos() { return gripperInitialPos; }
+  int getGripperDropPos() { return gripperDropPos; }
   int getSortingPos0() { return sortingPos0; }
   int getSortingPos1() { return sortingPos1; }
   int getSortingPos2() { return sortingPos2; }
@@ -104,6 +111,10 @@ public:
   
   // Individual servo test/configuration method
   void testServo(const String& servoName, int angle);
+
+  // Get the last color detected during collection (useful for Task5 unloading)
+  DetectedColor getLastDetectedColor() { return lastDetectedColor; }
+
 };
 
 // Global instance
