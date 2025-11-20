@@ -21,6 +21,9 @@
 
 #include <Arduino.h>
 
+// Servo pin definitions
+#define UNLOADING_Servo_PIN 39
+
 // ---------------- Task 5 Sub-States ----------------
 enum Task5SubState {
   T5_INIT,

@@ -108,7 +108,10 @@ bool BallCollector::collectingBall() {
   colorSensors.readTopSensor();
   DetectedColor ballColor = colorSensors.getTopColor();
   String colorName = colorSensors.getColorName(ballColor);
-  
+
+  // store last detected color so other modules (Task5) can use it
+  lastDetectedColor = ballColor;
+
   Serial.print("Detected color: ");
   Serial.println(colorName);
   Serial.print("RGB values - R: ");

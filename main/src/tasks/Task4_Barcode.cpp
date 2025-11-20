@@ -10,6 +10,7 @@
 /**********************************************************************/
 
 #include "Task4_Barcode.h"
+#include "Task5_Unloading.h"
 #include "../Motors.h"
 #include "../IRReading.h"
 #include "../OLEDDisplay.h"
@@ -358,6 +359,20 @@ void Task4Barcode::processBarcodeData() {
   Serial.println(barcodeData);
   Serial.print("Decimal: ");
   Serial.println(mostFrequentBarcode);
+
+// ======================
+// Forward barcode to Task 5
+// ======================
+
+  // --- Forward barcode to Task5 and start unloading ---
+  task5Unloading.setBarcodeValue((uint16_t)mostFrequentBarcode);
+  task5Unloading.setBarcodeBinary(barcodeData);
+  // Optionally immediately start Task5 so unloading runs now
+  task5Unloading.start();
+
+  Serial.println("Task4: forwarded barcode to Task5 and started unloading:");
+  Serial.print("  value = "); Serial.print(mostFrequentBarcode);
+  Serial.print("  binary = "); Serial.println(barcodeData);
 }
 
 bool Task4Barcode::isTurnComplete() {

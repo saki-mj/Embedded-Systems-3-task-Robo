@@ -7,7 +7,7 @@
 
 #include <Arduino.h>
 #include <ESP32Servo.h>
-
+#include "../ColorSensors.h"
 // Servo pin definitions
 #define ARM_SERVO_PIN 35
 #define GRIPPER_SERVO_PIN 36
@@ -43,6 +43,9 @@ private:
   unsigned long colorDetectDelay;     // Delay before color detection
   unsigned long sortingDelay;         // Delay at sorting position
   unsigned long completionDelay;      // Delay after sorting before DONE
+
+  // --- Added for Task5: last detected color ---
+  DetectedColor lastDetectedColor;
   
 public:
   BallCollector();
@@ -104,6 +107,10 @@ public:
   
   // Individual servo test/configuration method
   void testServo(const String& servoName, int angle);
+
+  // Get the last color detected during collection (useful for Task5 unloading)
+  DetectedColor getLastDetectedColor() { return lastDetectedColor; }
+
 };
 
 // Global instance

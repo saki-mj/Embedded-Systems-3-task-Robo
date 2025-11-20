@@ -19,6 +19,8 @@
 #define MUX_CHANNEL_3 3  // SCL3/SDA3 - Right TOF
 #define MUX_CHANNEL_4 4  // SCL4/SDA4 - Front TOF
 #define MUX_CHANNEL_5 5  // SCL5/SDA5 - Bottom Color Sensor
+#define MUX_CHANNEL_6 6  // SCL6/SDA6 - (unused or future)
+#define MUX_CHANNEL_7 7  // SCL7/SDA7 - (unused or future)
 
 class I2CMux {
   private:

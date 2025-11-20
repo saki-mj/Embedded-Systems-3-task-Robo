@@ -1,33 +1,207 @@
 /*********************************************************************
- * Task 5: Unloading Balls Implementation
+ * Task 5: Unloading Balls Implementation (revised)
+ * - Uses BACK TOF to detect unloading zone
+ * - Moves backward into position and aligns
+ * - Non-blocking servo sequence using ballCollector positions
+ * - Uses barcode parity rule to choose basket (chooseBasket())
  *********************************************************************/
-// SERIAL OUTPUT GUIDELINES:
-// - Print status ONCE when entering a new state (use static bool or state tracking)
-// - For time-based actions: print "Action for X ms" ONCE at start
-// - For condition-based actions: print "Action until condition" ONCE at start
-// - Avoid printing inside loops that run every cycle
-// - Low-level motor/sensor functions don't print - task prints context
-/**********************************************************************/
 
 #include "Task5_Unloading.h"
 #include "../Motors.h"
 #include "../TOFSensors.h"
 #include "../OLEDDisplay.h"
+#include "BallCollector.h" // for servo positions & testServo()
+
+extern Task5Unloading task5Unloading;
 
 Task5Unloading task5Unloading;
 
+// --- Navigation and Unloading Helpers (auto-generated) ---
+// Tuning constants — calibrate for your robot
+const float MS_PER_CM = 40.0;   // ms per cm (tune)
+const unsigned long TURN_MS_90 = 450; // ms for ~90° turn (tune)
+const uint16_t APPROACH_DISTANCE_CM = 30; // desired TOF stop distance (cm)
+
+static inline bool safeMoveBackwardUsingBackTOF(uint16_t stopDistanceMm, uint16_t timeoutMs) {
+  unsigned long start = millis();
+  setCurrentSpeed(60);
+  robotBackward();
+  while (millis() - start < timeoutMs) {
+    readTOFSensors();
+    if (tofSensors.isBackValid()) {
+      uint16_t d = tofSensors.getBackDistance();
+      if (d <= stopDistanceMm) {
+        stopAllMotors();
+        return true;
+      }
+    }
+    delay(10);
+  }
+  stopAllMotors();
+  return false;
+}
+static inline void moveBackwardCmTimed(float cm) {
+  unsigned long ms = (unsigned long)(cm * MS_PER_CM);
+  setCurrentSpeed(60);
+  robotBackward();
+  delay(ms);
+  stopAllMotors();
+}
+static inline void moveForwardCmTimed(float cm) {
+  unsigned long ms = (unsigned long)(cm * MS_PER_CM);
+  setCurrentSpeed(60);
+  robotForward();
+  delay(ms);
+  stopAllMotors();
+}
+static inline void turnRight90Timed() {
+  setCurrentSpeed(50);
+  robotTurnRight();
+  delay(TURN_MS_90);
+  stopAllMotors();
+}
+static inline void turnLeft90Timed() {
+  setCurrentSpeed(50);
+  robotTurnLeft();
+  delay(TURN_MS_90);
+  stopAllMotors();
+}
+static inline void performUnloadServo(BasketColor basket) {
+  int servoHome = ballCollector.getSortingPos1();
+  int servoBlue = ballCollector.getSortingPos0();
+  int servoRed  = ballCollector.getSortingPos2();
+  int targetAngle = (basket == BASKET_BLUE) ? servoBlue : servoRed;
+  oledDisplay.show("Unloading", (basket==BASKET_RED)?"RED":"BLUE");
+  ballCollector.testServo("SORTING", targetAngle);
+  delay(ballCollector.getSortingDelay());
+  ballCollector.testServo("SORTING", servoHome);
+  delay(ballCollector.getSortingDelay());
+}
+static inline BasketColor mapColorToBasket(bool barcodeIsEven, DetectedColor color) {
+  if (barcodeIsEven) {
+    if (color == COLOR_YELLOW) return BASKET_RED;
+    else                      return BASKET_BLUE;
+  } else {
+    if (color == COLOR_YELLOW) return BASKET_BLUE;
+    else                      return BASKET_RED;
+  }
+}
+void navigateAndUnload(bool barcodeIsEven, DetectedColor color) {
+  BasketColor basket = mapColorToBasket(barcodeIsEven, color);
+  Serial.print("navigateAndUnload: parityEven=");
+  Serial.print(barcodeIsEven ? "true" : "false");
+  Serial.print(" color=");
+  Serial.println(color == COLOR_YELLOW ? "YELLOW" : "WHITE");
+  Serial.print(" -> target = ");
+  Serial.println(basket == BASKET_RED ? "RED" : "BLUE");
+  const uint16_t stopMm = (uint16_t)(APPROACH_DISTANCE_CM * 10);
+  Serial.println("Approaching back zone (sensor-driven)...");
+  bool ok = safeMoveBackwardUsingBackTOF(stopMm, 5000);
+  if (!ok) {
+    Serial.println("Back TOF approach timeout — falling back to time-driven approach");
+    moveBackwardCmTimed(30.0);
+  }
+  setCurrentSpeed(30);
+  robotBackward();
+  delay((unsigned long) ( (float) task5Unloading.getAlignDuration() ));
+  stopAllMotors();
+  if (basket == BASKET_BLUE) {
+    Serial.println("Going to BLUE basket (left)");
+    turnLeft90Timed();
+    moveForwardCmTimed(45.0);
+    setCurrentSpeed(20);
+    robotForward();
+    delay(300);
+    stopAllMotors();
+  } else {
+    Serial.println("Going to RED basket (right)");
+    turnRight90Timed();
+    moveForwardCmTimed(45.0);
+    setCurrentSpeed(20);
+    robotForward();
+    delay(300);
+    stopAllMotors();
+  }
+  Serial.println("Unloading servo action...");
+  performUnloadServo(basket);
+  Serial.println("Retreating and re-orienting to collection position");
+  setCurrentSpeed(40);
+  robotBackward();
+  delay(400);
+  stopAllMotors();
+  if (basket == BASKET_BLUE) {
+    turnRight90Timed();
+  } else {
+    turnLeft90Timed();
+  }
+  moveForwardCmTimed(30.0);
+  Serial.println("navigateAndUnload: done");
+}
+void navigateAndUnloadFromLastCollection(DetectedColor color) {
+  extern bool lastBarcodeEven;
+  navigateAndUnload(lastBarcodeEven, color);
+}
+// --- End Navigation and Unloading Helpers ---
+
+// Local sequencing states for non-blocking unload
+namespace {
+  enum UnloadStep { US_IDLE = 0, US_MOVED_TO_TARGET, US_WAIT_AFTER_MOVE, US_RETURNED_HOME, US_WAIT_AFTER_HOME };
+  UnloadStep unloadStep = US_IDLE;
+  unsigned long stepEndTime = 0;
+
+  // Debounce for back TOF detection (require N consecutive good readings)
+  const uint8_t BACK_DEBOUNCE_REQUIRED = 3;
+  uint8_t backGoodCount = 0;
+}
+
+// ---------------- Constructor ----------------
 Task5Unloading::Task5Unloading() {
   currentSubState = T5_INIT;
   subStateStartTime = 0;
   taskActive = false;
   ballsUnloaded = 0;
-  
-  // Default configuration (can be changed via serial commands)
-  unloadDuration = 3000;  // 3 seconds to unload balls
-  alignDuration = 1500;  // 1.5 seconds alignment
-  zoneDetectionDistance = 150;  // mm
-  targetBallCount = 3;  // Expected number of balls
+
+  // Motion defaults (can be changed via Serial)
+  navigateSpeed         = 60;   // speed while approaching (adjustable)
+  alignSpeed            = 35;   // slow creep for precise align
+  unloadSpeed           = 40;   // reserved if you want to move while unloading
+  unloadDuration        = 2000; // ms waiting after servo returns home
+  alignDuration         = 1200; // ms of slow backward creep for final align
+  zoneDetectionDistance = 150;  // mm threshold for back TOF to detect zone
+  targetBallCount       = 1;    // how many items to unload by default
+
+  // Sorting / barcode defaults
+  barcodeBinary   = "";
+  barcodeValue    = 0;
+  barcodeValid    = false;
+  potatoQuality   = POTATO_GOOD;
+  targetBasket    = BASKET_RED;
+  hasSortedThisCycle = false;
 }
+
+// ---------------- Helpers ----------------
+
+uint16_t Task5Unloading::binaryToValue(const String &bin) const {
+  uint16_t value = 0;
+  for (int i = 0; i < bin.length(); i++) {
+    char c = bin.charAt(i);
+    if (c == '0' || c == '1') {
+      value = (value << 1) | (c == '1' ? 1 : 0);
+    }
+  }
+  return value;
+}
+
+BasketColor Task5Unloading::chooseBasket() const {
+  bool isEven = (barcodeValue % 2 == 0);
+  if (isEven) {
+    return (potatoQuality == POTATO_GOOD) ? BASKET_RED : BASKET_BLUE;
+  } else {
+    return (potatoQuality == POTATO_GOOD) ? BASKET_BLUE : BASKET_RED;
+  }
+}
+
+// ---------------- Init / Start / Stop ----------------
 
 void Task5Unloading::init() {
   Serial.println("=== Task 5: Unloading - Initializing ===");
@@ -35,54 +209,269 @@ void Task5Unloading::init() {
   subStateStartTime = millis();
   taskActive = false;
   ballsUnloaded = 0;
+  hasSortedThisCycle = false;
+  unloadStep = US_IDLE;
+  backGoodCount = 0;
+
   oledDisplay.show("Task 5", "Unloading", "Initialized");
-  delay(1000);
+  delay(250);
 }
 
+void Task5Unloading::start() {
+  Serial.println("Starting Task 5: Unloading");
+
+  // If barcode was not set explicitly, default to 0
+  if (!barcodeValid) {
+    Serial.println("Task 5: WARNING - barcode not set, using 0");
+    barcodeValue = 0;
+    barcodeBinary = "0000";
+    barcodeValid = true;
+  }
+
+  // Pre-compute the target basket from current barcode and quality
+  targetBasket = chooseBasket();
+
+  taskActive = true;
+  setSubState(T5_INIT);
+}
+
+void Task5Unloading::stop() {
+  Serial.println("Stopping Task 5: Unloading");
+  taskActive = false;
+  stopAllMotors();
+  unloadStep = US_IDLE;
+}
+
+bool Task5Unloading::isActive()    { return taskActive; }
+bool Task5Unloading::isCompleted() { return currentSubState == T5_COMPLETED; }
+
+void Task5Unloading::reset() {
+  currentSubState = T5_INIT;
+  subStateStartTime = millis();
+  taskActive = false;
+  ballsUnloaded = 0;
+  barcodeBinary = "";
+  barcodeValue = 0;
+  barcodeValid = false;
+  hasSortedThisCycle = false;
+  unloadStep = US_IDLE;
+  backGoodCount = 0;
+}
+
+int Task5Unloading::getBallsUnloaded() {
+  return ballsUnloaded;
+}
+
+// ---------------- Barcode / Quality setters -------------
+void Task5Unloading::setBarcodeBinary(const String &binary) {
+  barcodeBinary = binary;
+  barcodeValue  = binaryToValue(binary);
+  barcodeValid  = true;
+  Serial.print("Task 5: Barcode binary set to ");
+  Serial.print(barcodeBinary);
+  Serial.print(" -> value = ");
+  Serial.println(barcodeValue);
+  targetBasket = chooseBasket();
+}
+
+void Task5Unloading::setBarcodeValue(uint16_t value) {
+  barcodeValue  = value;
+  barcodeBinary = String(value, BIN);
+  barcodeValid  = true;
+  Serial.print("Task 5: Barcode value set to ");
+  Serial.print(barcodeValue);
+  Serial.print(" (binary ");
+  Serial.print(barcodeBinary);
+  Serial.println(")");
+  targetBasket = chooseBasket();
+}
+
+void Task5Unloading::setPotatoQuality(PotatoQuality q) {
+  potatoQuality = q;
+  Serial.print("Task 5: Potato quality set to ");
+  Serial.println((q == POTATO_GOOD) ? "GOOD" : "BAD");
+}
+
+// ---------------- Main execute() ----------------
+// Uses BACK TOF: tofSensors.getBackDistance() and tofSensors.isBackValid()
 void Task5Unloading::execute() {
   if (!taskActive) return;
-  
-  switch(currentSubState) {
-    case T5_INIT:
-      Serial.println("Task 5: INIT state");
-      // Add your code here
+
+  // keep display updated
+  updateDisplay();
+
+  switch (currentSubState) {
+
+    // INIT – start moving backward to approach rear unloading zone
+    case T5_INIT: {
+      Serial.println("Task 5: INIT -> moving backward to find back zone");
+      ballsUnloaded = 0;
+      hasSortedThisCycle = false;
+      unloadStep = US_IDLE;
+      backGoodCount = 0;
+
+      // start moving backward
+      setCurrentSpeed(navigateSpeed);
+      robotBackward();
+      setSubState(T5_NAVIGATE_TO_ZONE);
       break;
-      
-    case T5_NAVIGATE_TO_ZONE:
-      Serial.println("Task 5: NAVIGATE_TO_ZONE state");
-      // Add your code here
+    }
+
+    // NAVIGATE_TO_ZONE – monitor BACK TOF and debounce detection
+    case T5_NAVIGATE_TO_ZONE: {
+      readTOFSensors();
+      uint16_t backDist = tofSensors.getBackDistance();
+      bool backOk = tofSensors.isBackValid();
+
+      // debug print occasionally (not every cycle)
+      static unsigned long lastNavPrint = 0;
+      if (millis() - lastNavPrint > 300) {
+        Serial.print("T5 NAV (back): ");
+        if (backOk) Serial.print(backDist);
+        else Serial.print("INVALID");
+        Serial.print(" mm  threshold=");
+        Serial.println(zoneDetectionDistance);
+        lastNavPrint = millis();
+      }
+
+      if (backOk && backDist <= zoneDetectionDistance) {
+        backGoodCount++;
+      } else {
+        backGoodCount = 0;
+      }
+
+      if (backGoodCount >= BACK_DEBOUNCE_REQUIRED) {
+        // confirmed detection
+        stopAllMotors();
+        Serial.print("Task 5: Back zone confirmed at ");
+        Serial.print(backDist);
+        Serial.println(" mm -> ALIGN");
+        setSubState(T5_ALIGN);
+      } else {
+        // keep moving backward (ensure speed set)
+        setCurrentSpeed(navigateSpeed);
+        robotBackward();
+      }
       break;
-      
-    case T5_ALIGN:
-      Serial.println("Task 5: ALIGN state");
-      // Add your code here
+    }
+
+    // ALIGN – small backward creep for alignDuration (non-blocking)
+    case T5_ALIGN: {
+      unsigned long elapsed = millis() - subStateStartTime;
+      if (elapsed == 0) {
+        Serial.print("Task 5: ALIGN (backward creep) for ");
+        Serial.print(alignDuration);
+        Serial.println(" ms");
+      }
+
+      if (elapsed < alignDuration) {
+        setCurrentSpeed(alignSpeed);
+        robotBackward();
+      } else {
+        stopAllMotors();
+        Serial.println("Task 5: ALIGN done -> UNLOADING");
+        setSubState(T5_UNLOADING);
+      }
       break;
-      
-    case T5_UNLOADING:
-      Serial.println("Task 5: UNLOADING state");
-      // Add unloading mechanism control here
+    }
+
+    // UNLOADING – non-blocking servo sequence
+    case T5_UNLOADING: {
+      // If we've already unloaded required number, go to VERIFY
+      if (ballsUnloaded >= (int)targetBallCount) {
+        Serial.println("Task 5: target ball count reached -> VERIFY");
+        setSubState(T5_VERIFY);
+        break;
+      }
+
+      // Start sequence if idle
+      if (unloadStep == US_IDLE) {
+        hasSortedThisCycle = true;
+
+        // decide target basket using barcode parity + quality
+        targetBasket = chooseBasket();
+
+        Serial.print("Task 5: UNLOADING -> target basket: ");
+        Serial.println((targetBasket == BASKET_RED) ? "RED" : "BLUE");
+
+        int servoHome = ballCollector.getSortingPos1();
+        int servoBlue = ballCollector.getSortingPos0();
+        int servoRed  = ballCollector.getSortingPos2();
+
+        int targetAngle = (targetBasket == BASKET_BLUE) ? servoBlue : servoRed;
+
+        // Move to target (we assume ballCollector.testServo schedules/sets position)
+        ballCollector.testServo("SORTING", targetAngle);
+
+        // Wait for mechanical movement duration (non-blocking)
+        unloadStep = US_MOVED_TO_TARGET;
+        stepEndTime = millis() + (unsigned long)ballCollector.getSortingDelay();
+      }
+      else if (unloadStep == US_MOVED_TO_TARGET) {
+        if (millis() >= stepEndTime) {
+          // Return servo to home
+          int servoHome = ballCollector.getSortingPos1();
+          ballCollector.testServo("SORTING", servoHome);
+
+          unloadStep = US_WAIT_AFTER_MOVE;
+          stepEndTime = millis() + (unsigned long)ballCollector.getSortingDelay();
+        }
+      }
+      else if (unloadStep == US_WAIT_AFTER_MOVE) {
+        if (millis() >= stepEndTime) {
+          // Count the unloaded ball and wait unloadDuration before next cycle
+          ballsUnloaded++;
+          Serial.print("Task 5: ballsUnloaded = ");
+          Serial.println(ballsUnloaded);
+
+          unloadStep = US_RETURNED_HOME;
+          stepEndTime = millis() + unloadDuration;
+        }
+      }
+      else if (unloadStep == US_RETURNED_HOME) {
+        if (millis() >= stepEndTime) {
+          // completed unload cycle
+          unloadStep = US_IDLE;
+          // Either repeat to unload next ball or go verify (loop top checks target count)
+        }
+      }
       break;
-      
-    case T5_VERIFY:
-      Serial.println("Task 5: VERIFY state");
-      // Verify unloading completed
+    }
+
+    // VERIFY – simple; extend with sensors if you want robust checks
+    case T5_VERIFY: {
+      Serial.println("Task 5: VERIFY - assuming success");
+      setSubState(T5_COMPLETED);
       break;
-      
-    case T5_COMPLETED:
+    }
+
+    // COMPLETED – finish
+    case T5_COMPLETED: {
       Serial.println("Task 5: COMPLETED");
-      Serial.print("Balls Unloaded: ");
+      Serial.print("  Balls/Items unloaded: ");
       Serial.println(ballsUnloaded);
+      stopAllMotors();
       taskActive = false;
+      unloadStep = US_IDLE;
       break;
-  }
+    }
+
+    default: {
+      Serial.println("Task 5: Unknown state - resetting");
+      setSubState(T5_INIT);
+      break;
+    }
+  } // switch
 }
+
+// ---------------- Display & helpers ----------------
 
 void Task5Unloading::updateDisplay() {
   if (!taskActive) return;
   oledDisplay.show(
     "Task 5: Unloading",
     "State: " + getSubStateName(),
-    "Balls: " + String(ballsUnloaded)
+    "Count: " + String(ballsUnloaded)
   );
 }
 
@@ -90,8 +479,15 @@ void Task5Unloading::setSubState(Task5SubState newSubState) {
   if (currentSubState != newSubState) {
     currentSubState = newSubState;
     subStateStartTime = millis();
-    Serial.print("Task 5 sub-state: ");
+    Serial.print("Task 5 sub-state -> ");
     Serial.println(getSubStateName());
+
+    // Reset sequencing if leaving UNLOADING
+    if (newSubState != T5_UNLOADING) {
+      unloadStep = US_IDLE;
+      backGoodCount = 0;
+    }
+
     updateDisplay();
   }
 }
@@ -101,52 +497,40 @@ Task5SubState Task5Unloading::getSubState() {
 }
 
 String Task5Unloading::getSubStateName() {
-  switch(currentSubState) {
-    case T5_INIT: return "INIT";
+  switch (currentSubState) {
+    case T5_INIT:             return "INIT";
     case T5_NAVIGATE_TO_ZONE: return "NAVIGATE";
-    case T5_ALIGN: return "ALIGN";
-    case T5_UNLOADING: return "UNLOADING";
-    case T5_VERIFY: return "VERIFY";
-    case T5_COMPLETED: return "COMPLETED";
-    default: return "UNKNOWN";
+    case T5_ALIGN:            return "ALIGN";
+    case T5_UNLOADING:        return "UNLOADING";
+    case T5_VERIFY:           return "VERIFY";
+    case T5_COMPLETED:        return "COMPLETED";
+    default:                  return "UNKNOWN";
   }
 }
 
-void Task5Unloading::start() {
-  Serial.println("Starting Task 5: Unloading");
-  taskActive = true;
-  setSubState(T5_INIT);
+// ---------------- Config setters / getters --------------
+
+void Task5Unloading::setNavigateSpeed(uint16_t speed) {
+  navigateSpeed = speed;
+  Serial.print("T5 Navigate speed set to ");
+  Serial.println(speed);
 }
 
-void Task5Unloading::stop() {
-  Serial.println("Stopping Task 5: Unloading");
-  taskActive = false;
-  stopAllMotors();
+void Task5Unloading::setAlignSpeed(uint16_t speed) {
+  alignSpeed = speed;
+  Serial.print("T5 Align speed set to ");
+  Serial.println(speed);
 }
 
-bool Task5Unloading::isActive() {
-  return taskActive;
+void Task5Unloading::setUnloadSpeed(uint16_t speed) {
+  unloadSpeed = speed;
+  Serial.print("T5 Unload speed set to ");
+  Serial.println(speed);
 }
 
-bool Task5Unloading::isCompleted() {
-  return (currentSubState == T5_COMPLETED);
-}
-
-void Task5Unloading::reset() {
-  currentSubState = T5_INIT;
-  subStateStartTime = millis();
-  taskActive = false;
-  ballsUnloaded = 0;
-}
-
-int Task5Unloading::getBallsUnloaded() {
-  return ballsUnloaded;
-}
-
-// Configuration setters
 void Task5Unloading::setUnloadDuration(unsigned long timeMs) {
   unloadDuration = timeMs;
-  Serial.print("T5 Unload duration set to: ");
+  Serial.print("T5 Unload duration set to ");
   Serial.print(timeMs);
   Serial.println(" ms");
 }
@@ -171,19 +555,7 @@ void Task5Unloading::setTargetBallCount(uint16_t count) {
   Serial.println(count);
 }
 
-// Configuration getters
-unsigned long Task5Unloading::getUnloadDuration() {
-  return unloadDuration;
-}
-
-unsigned long Task5Unloading::getAlignDuration() {
-  return alignDuration;
-}
-
-uint16_t Task5Unloading::getZoneDetectionDistance() {
-  return zoneDetectionDistance;
-}
-
-uint16_t Task5Unloading::getTargetBallCount() {
-  return targetBallCount;
-}
+unsigned long Task5Unloading::getUnloadDuration()    { return unloadDuration; }
+unsigned long Task5Unloading::getAlignDuration()     { return alignDuration; }
+uint16_t Task5Unloading::getZoneDetectionDistance()  { return zoneDetectionDistance; }
+uint16_t Task5Unloading::getTargetBallCount()        { return targetBallCount; }

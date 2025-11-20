@@ -404,6 +404,21 @@ void processSerialCommand(String command) {
     else if (q == "BAD") task5Unloading.setPotatoQuality(POTATO_BAD);
     else Serial.println("T5QUALITY must be GOOD or BAD");
   }
+  // --- Custom: Odd/Even Barcode Command for Task 5 ---
+  else if (command == "ODD") {
+    task5Unloading.setBarcodeValue(1); // Odd barcode value
+    task5Unloading.setPotatoQuality(POTATO_GOOD); // Default to GOOD, or let user set
+    task5Unloading.start();
+    Serial.println("Task 5: Started with ODD barcode value (1)");
+    oledDisplay.show("T5 Barcode", "ODD (1)", "Started");
+  }
+  else if (command == "EVEN") {
+    task5Unloading.setBarcodeValue(0); // Even barcode value
+    task5Unloading.setPotatoQuality(POTATO_GOOD); // Default to GOOD, or let user set
+    task5Unloading.start();
+    Serial.println("Task 5: Started with EVEN barcode value (0)");
+    oledDisplay.show("T5 Barcode", "EVEN (0)", "Started");
+  }
   // Ball Collector Commands
   else if (command == "BALLCOLLECT") {
     Serial.println("Starting ball collection sequence...");
@@ -665,6 +680,8 @@ void printSerialCommands() {
   Serial.println("  T5BARCODEBIN <bin> - Set barcode as binary string (e.g. 1010)");
   Serial.println("  T5BARCODEVAL <val> - Set barcode as integer value (e.g. 10)");
   Serial.println("  T5QUALITY <GOOD|BAD> - Set potato/ball quality");
+  Serial.println("  ODD - Start Task 5 with ODD barcode value (1)");
+  Serial.println("  EVEN - Start Task 5 with EVEN barcode value (0)");
   Serial.println();
   Serial.println("Ball Collector:");
   Serial.println("  BALLCOLLECT - Execute ball collection sequence");
