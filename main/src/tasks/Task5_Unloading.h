@@ -53,9 +53,6 @@ class Task5Unloading {
     int  ballsUnloaded;
 
     // Motion / timing configuration
-    uint16_t navigateSpeed;
-    uint16_t alignSpeed;
-    uint16_t unloadSpeed;
     unsigned long unloadDuration;
     unsigned long alignDuration;
     uint16_t zoneDetectionDistance;
@@ -107,10 +104,7 @@ class Task5Unloading {
     PotatoQuality getPotatoQuality() const { return potatoQuality; }
     BasketColor   getTargetBasket() const { return targetBasket; }
 
-    // Configuration setters (speed / timing / detection)
-    void setNavigateSpeed(uint16_t speed);
-    void setAlignSpeed(uint16_t speed);
-    void setUnloadSpeed(uint16_t speed);
+    // Configuration setters (timing / detection)
     void setUnloadDuration(unsigned long timeMs);
     void setAlignDuration(unsigned long timeMs);
     void setZoneDetectionDistance(uint16_t distance);

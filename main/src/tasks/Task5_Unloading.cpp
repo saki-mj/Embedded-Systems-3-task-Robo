@@ -24,8 +24,7 @@ const uint16_t APPROACH_DISTANCE_CM = 30; // desired TOF stop distance (cm)
 
 static inline bool safeMoveBackwardUsingBackTOF(uint16_t stopDistanceMm, uint16_t timeoutMs) {
   unsigned long start = millis();
-  setCurrentSpeed(60);
-  robotBackward();
+  robotBackward();  // Uses global baseSpeed
   while (millis() - start < timeoutMs) {
     readTOFSensors();
     if (tofSensors.isBackValid()) {
@@ -42,27 +41,23 @@ static inline bool safeMoveBackwardUsingBackTOF(uint16_t stopDistanceMm, uint16_
 }
 static inline void moveBackwardCmTimed(float cm) {
   unsigned long ms = (unsigned long)(cm * MS_PER_CM);
-  setCurrentSpeed(60);
-  robotBackward();
+  robotBackward();  // Uses global baseSpeed
   delay(ms);
   stopAllMotors();
 }
 static inline void moveForwardCmTimed(float cm) {
   unsigned long ms = (unsigned long)(cm * MS_PER_CM);
-  setCurrentSpeed(60);
-  robotForward();
+  robotForward();  // Uses global baseSpeed
   delay(ms);
   stopAllMotors();
 }
 static inline void turnRight90Timed() {
-  setCurrentSpeed(50);
-  robotTurnRight();
+  robotTurnRight();  // Uses global rotateSpeed
   delay(TURN_MS_90);
   stopAllMotors();
 }
 static inline void turnLeft90Timed() {
-  setCurrentSpeed(50);
-  robotTurnLeft();
+  robotTurnLeft();  // Uses global rotateSpeed
   delay(TURN_MS_90);
   stopAllMotors();
 }
@@ -101,32 +96,28 @@ void navigateAndUnload(bool barcodeIsEven, DetectedColor color) {
     Serial.println("Back TOF approach timeout — falling back to time-driven approach");
     moveBackwardCmTimed(30.0);
   }
-  setCurrentSpeed(30);
-  robotBackward();
+  robotBackward();  // Uses global baseSpeed
   delay((unsigned long) ( (float) task5Unloading.getAlignDuration() ));
   stopAllMotors();
   if (basket == BASKET_BLUE) {
     Serial.println("Going to BLUE basket (left)");
     turnLeft90Timed();
     moveForwardCmTimed(45.0);
-    setCurrentSpeed(20);
-    robotForward();
+    robotForward();  // Uses global baseSpeed
     delay(300);
     stopAllMotors();
   } else {
     Serial.println("Going to RED basket (right)");
     turnRight90Timed();
     moveForwardCmTimed(45.0);
-    setCurrentSpeed(20);
-    robotForward();
+    robotForward();  // Uses global baseSpeed
     delay(300);
     stopAllMotors();
   }
   Serial.println("Unloading servo action...");
   performUnloadServo(basket);
   Serial.println("Retreating and re-orienting to collection position");
-  setCurrentSpeed(40);
-  robotBackward();
+  robotBackward();  // Uses global baseSpeed
   delay(400);
   stopAllMotors();
   if (basket == BASKET_BLUE) {
@@ -162,9 +153,6 @@ Task5Unloading::Task5Unloading() {
   ballsUnloaded = 0;
 
   // Motion defaults (can be changed via Serial)
-  navigateSpeed         = 60;   // speed while approaching (adjustable)
-  alignSpeed            = 35;   // slow creep for precise align
-  unloadSpeed           = 40;   // reserved if you want to move while unloading
   unloadDuration        = 2000; // ms waiting after servo returns home
   alignDuration         = 1200; // ms of slow backward creep for final align
   zoneDetectionDistance = 150;  // mm threshold for back TOF to detect zone
@@ -311,8 +299,7 @@ void Task5Unloading::execute() {
       backGoodCount = 0;
 
       // start moving backward
-      setCurrentSpeed(navigateSpeed);
-      robotBackward();
+      robotBackward();  // Uses global baseSpeed
       setSubState(T5_NAVIGATE_TO_ZONE);
       break;
     }
@@ -349,8 +336,7 @@ void Task5Unloading::execute() {
         setSubState(T5_ALIGN);
       } else {
         // keep moving backward (ensure speed set)
-        setCurrentSpeed(navigateSpeed);
-        robotBackward();
+        robotBackward();  // Uses global baseSpeed
       }
       break;
     }
@@ -365,8 +351,7 @@ void Task5Unloading::execute() {
       }
 
       if (elapsed < alignDuration) {
-        setCurrentSpeed(alignSpeed);
-        robotBackward();
+        robotBackward();  // Uses global baseSpeed
       } else {
         stopAllMotors();
         Serial.println("Task 5: ALIGN done -> UNLOADING");
@@ -509,24 +494,6 @@ String Task5Unloading::getSubStateName() {
 }
 
 // ---------------- Config setters / getters --------------
-
-void Task5Unloading::setNavigateSpeed(uint16_t speed) {
-  navigateSpeed = speed;
-  Serial.print("T5 Navigate speed set to ");
-  Serial.println(speed);
-}
-
-void Task5Unloading::setAlignSpeed(uint16_t speed) {
-  alignSpeed = speed;
-  Serial.print("T5 Align speed set to ");
-  Serial.println(speed);
-}
-
-void Task5Unloading::setUnloadSpeed(uint16_t speed) {
-  unloadSpeed = speed;
-  Serial.print("T5 Unload speed set to ");
-  Serial.println(speed);
-}
 
 void Task5Unloading::setUnloadDuration(unsigned long timeMs) {
   unloadDuration = timeMs;

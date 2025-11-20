@@ -448,25 +448,41 @@ void processSerialCommand(String command) {
     }
   }
   else if (command.startsWith("BCGRIPPOS ")) {
-    // Format: BCGRIPPOS pos0 pos1
-    int spaceIndex = command.indexOf(' ', 10);
-    if (spaceIndex > 0) {
-      int pos0 = command.substring(10, spaceIndex).toInt();
-      int pos1 = command.substring(spaceIndex + 1).toInt();
-      ballCollector.setGripperPositions(pos0, pos1);
+    // Format: BCGRIPPOS pos0 pos1 initialPos dropPos
+    String params = command.substring(10);
+    params.trim();
+    
+    int firstSpace = params.indexOf(' ');
+    int secondSpace = params.indexOf(' ', firstSpace + 1);
+    int thirdSpace = params.indexOf(' ', secondSpace + 1);
+    
+    if (firstSpace > 0 && secondSpace > 0 && thirdSpace > 0) {
+      int pos0 = params.substring(0, firstSpace).toInt();
+      int pos1 = params.substring(firstSpace + 1, secondSpace).toInt();
+      int initialPos = params.substring(secondSpace + 1, thirdSpace).toInt();
+      int dropPos = params.substring(thirdSpace + 1).toInt();
+      ballCollector.setGripperPositions(pos0, pos1, initialPos, dropPos);
       Serial.print("Gripper positions updated - Open: ");
       Serial.print(pos0);
       Serial.print("°, Closed: ");
       Serial.print(pos1);
+      Serial.print("°, Initial: ");
+      Serial.print(initialPos);
+      Serial.print("°, Drop: ");
+      Serial.print(dropPos);
       Serial.println("°");
-      oledDisplay.show("Grip Pos", String(pos0) + "," + String(pos1));
+      oledDisplay.show("Grip Pos", String(pos0) + "," + String(pos1) + "," + String(initialPos) + "," + String(dropPos));
     } else {
       Serial.print("Current - Open: ");
       Serial.print(ballCollector.getGripperPos0());
       Serial.print("°, Closed: ");
       Serial.print(ballCollector.getGripperPos1());
+      Serial.print("°, Initial: ");
+      Serial.print(ballCollector.getGripperInitialPos());
+      Serial.print("°, Drop: ");
+      Serial.print(ballCollector.getGripperDropPos());
       Serial.println("°");
-      Serial.println("Usage: BCGRIPPOS <pos0> <pos1>");
+      Serial.println("Usage: BCGRIPPOS <pos0> <pos1> <initialPos> <dropPos>");
     }
   }
   else if (command.startsWith("BCSORTPOS ")) {
@@ -686,43 +702,10 @@ void printSerialCommands() {
   Serial.println("Ball Collector:");
   Serial.println("  BALLCOLLECT - Execute ball collection sequence");
   Serial.println();
-  Serial.println("  Servo Position Configuration:");
-  Serial.print("    BCARMPOS <pos0> <pos1> - Set arm positions (Current: ");
-  Serial.print(ballCollector.getArmPos0());
-  Serial.print("°, ");
-  Serial.print(ballCollector.getArmPos1());
-  Serial.println("°)");
-  Serial.print("    BCGRIPPOS <pos0> <pos1> - Set gripper positions (Current: ");
-  Serial.print(ballCollector.getGripperPos0());
-  Serial.print("°, ");
-  Serial.print(ballCollector.getGripperPos1());
-  Serial.println("°)");
-  Serial.print("    BCSORTPOS <pos0> <pos1> <pos2> - Set sorting positions (Current: ");
-  Serial.print(ballCollector.getSortingPos0());
-  Serial.print("°, ");
-  Serial.print(ballCollector.getSortingPos1());
-  Serial.print("°, ");
-  Serial.print(ballCollector.getSortingPos2());
-  Serial.println("°)");
-  Serial.println();
   Serial.println("  Individual Servo Testing (0-180°):");
   Serial.println("    CONFIGARM <angle> - Test arm servo at specific angle");
   Serial.println("    CONFIGGRIP <angle> - Test gripper servo at specific angle");
   Serial.println("    CONFIGSORT <angle> - Test sorting servo at specific angle");
-  Serial.println();
-  Serial.println("  Timing Configuration (milliseconds):");
-  Serial.print("    BCSERVODELAY <ms> - Servo movement delay (Current: ");
-  Serial.print(ballCollector.getServoMoveDelay());
-  Serial.println(" ms)");
-  Serial.print("    BCCOLORDELAY <ms> - Color detection delay (Current: ");
-  Serial.print(ballCollector.getColorDetectDelay());
-  Serial.println(" ms)");
-  Serial.print("    BCSORTDELAY <ms> - Sorting position delay (Current: ");
-  Serial.print(ballCollector.getSortingDelay());
-  Serial.println(" ms)");
-  Serial.print("    BCDONEDELAY <ms> - Completion delay before DONE (Current: ");
-  Serial.print(ballCollector.getCompletionDelay());
-  Serial.println(" ms)");
   Serial.println();
   Serial.println("State Machine:");
   Serial.println("  START - Enter IDLE state (ready to run)");

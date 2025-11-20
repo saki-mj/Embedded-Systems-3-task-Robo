@@ -34,6 +34,8 @@ private:
   int armPos1;        // Arm pickup position
   int gripperPos0;    // Gripper open
   int gripperPos1;    // Gripper closed
+  int gripperInitialPos;  // Gripper initial position (before arm moves)
+  int gripperDropPos;     // Gripper drop position (after arm returns)
   int sortingPos0;    // Sorting yellow position
   int sortingPos1;    // Sorting initial/home position
   int sortingPos2;    // Sorting white position
@@ -76,7 +78,7 @@ public:
   
   // Set servo positions (for calibration)
   void setArmPositions(int pos0, int pos1);
-  void setGripperPositions(int pos0, int pos1);
+  void setGripperPositions(int pos0, int pos1, int initialPos, int dropPos);
   void setSortingPositions(int pos0, int pos1, int pos2);
   
   // Servo control methods
@@ -89,6 +91,8 @@ public:
   int getArmPos1() { return armPos1; }
   int getGripperPos0() { return gripperPos0; }
   int getGripperPos1() { return gripperPos1; }
+  int getGripperInitialPos() { return gripperInitialPos; }
+  int getGripperDropPos() { return gripperDropPos; }
   int getSortingPos0() { return sortingPos0; }
   int getSortingPos1() { return sortingPos1; }
   int getSortingPos2() { return sortingPos2; }
