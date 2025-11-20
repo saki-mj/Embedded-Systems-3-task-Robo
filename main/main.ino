@@ -25,6 +25,7 @@ int rotateSpeed = 80;   // Speed for turning/rotation (PWM: 0-1023)
 #include "src/tasks/Task4_Barcode.h"
 #include "src/tasks/Task5_Unloading.h"
 #include "src/tasks/BallCollector.h"
+#include "src/Gyroscope.h"
 
 // -------------------------------------------------------------------------
 // Activity Tracking for QR Code Display
@@ -56,8 +57,29 @@ void setup() {
   // Initialize motors
   initMotors();
   
+  // Initialize gyroscope
+  Serial.println("\n--- Gyroscope Calibration ---");
+  oledDisplay.show("Calibrating", "Gyroscope", "Keep Steady!");
+  delay(1000);
+  initGyroscope();
+  if (gyroscope.isInitialized()) {
+    Serial.println("\n*** KEEP ROBOT ABSOLUTELY STILL ***");
+    Serial.println("*** Gyroscope calibration starting in 2 seconds ***");
+    gyroscope.calibrate();
+    Serial.println("Gyroscope calibration complete!\n");
+  }
+  
   // Initialize IR sensors
   initIRSensors();
+  
+  // Calibrate IR sensors
+  Serial.println("\n--- IR Sensor Calibration ---");
+  oledDisplay.show("Calibrating", "IR Sensors", "Move sensors!");
+  delay(1000);
+  Serial.println("\n*** MOVE IR SENSORS OVER BLACK AND WHITE SURFACES ***");
+  Serial.println("*** IR calibration starting... ***");
+  calibrateIRSensors();
+  Serial.println("IR sensor calibration complete!\n");
   
   // Initialize TOF sensors
   initTOFSensors();

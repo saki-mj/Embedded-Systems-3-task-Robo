@@ -21,12 +21,13 @@ TOFSensors::TOFSensors() {
   rightValid = false;
   backValid = false;
   
-  // Initialize calibration errors to 0
-  errorLeft = 0;
-  errorFront = 0;
-  errorRight = 0;
-  errorBack = 0;
-  calibrated = false;
+  // Initialize calibration errors with measured offsets
+  // When real distance is 100mm: Left reads 170mm, Front reads 136mm, Right reads 147mm, Back reads 138mm
+  errorLeft = 70;   // 170 - 100 = 70mm offset
+  errorFront = 36;  // 136 - 100 = 36mm offset
+  errorRight = 47;  // 147 - 100 = 47mm offset
+  errorBack = 38;   // 138 - 100 = 38mm offset
+  calibrated = true;
   
   obstacleThreshold = TOF_OBSTACLE_THRESHOLD;
   continuousReadingActive = false;
