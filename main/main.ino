@@ -4,6 +4,12 @@
 
 #include <ESP32Servo.h>
 #include "src/Motors.h"
+
+// -------------------------------------------------------------------------
+// Global Speed Variables
+// -------------------------------------------------------------------------
+int baseSpeed = 100;    // Base speed for forward movement (PWM: 0-1023)
+int rotateSpeed = 80;   // Speed for turning/rotation (PWM: 0-1023)
 #include "src/IRReading.h"
 #include "src/LineFollow.h"
 #include "src/WallFollow.h"
@@ -84,15 +90,16 @@ void setup() {
   // Print available commands
   printSerialCommands();
   
-  // Set default speed to level 1 (50 PWM)
-  setSpeedLevel(1);
-  
   Serial.println("\n=== Robot Ready ===\n");
+  Serial.print("Base Speed: ");
+  Serial.println(baseSpeed);
+  Serial.print("Rotate Speed: ");
+  Serial.println(rotateSpeed);
   
   // Show ready status
   oledDisplay.show("Robot Ready", "Type HELP");
   delay(2000);
-  oledDisplay.showStatus("Idle", getCurrentSpeed());
+  oledDisplay.showStatus("Idle", baseSpeed);
   
   // Initialize activity tracking
   updateActivity();

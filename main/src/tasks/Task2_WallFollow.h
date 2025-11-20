@@ -25,9 +25,6 @@ class Task2WallFollow {
     bool taskActive;
     
     // Configuration parameters (can be changed via serial commands)
-    uint16_t approachSpeed;
-    uint16_t followSpeed;
-    uint16_t turnSpeed;
     uint16_t wallDetectionDistance;
     uint16_t targetWallDistance;
     unsigned long turnDuration;
@@ -48,18 +45,12 @@ class Task2WallFollow {
     void reset();
     
     // Configuration setters
-    void setApproachSpeed(uint16_t speed);
-    void setFollowSpeed(uint16_t speed);
-    void setTurnSpeed(uint16_t speed);
     void setWallDetectionDistance(uint16_t distance);
     void setTargetWallDistance(uint16_t distance);
     void setTurnDuration(unsigned long timeMs);
     void setAlignDuration(unsigned long timeMs);
     
     // Configuration getters
-    uint16_t getApproachSpeed();
-    uint16_t getFollowSpeed();
-    uint16_t getTurnSpeed();
     uint16_t getWallDetectionDistance();
     uint16_t getTargetWallDistance();
     unsigned long getTurnDuration();

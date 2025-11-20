@@ -11,11 +11,6 @@
 #include "LineFollow.h"
 
 // -------------------------------------------------------------------------
-// Global Variables
-// -------------------------------------------------------------------------
-int currentSpeed = 25; // Default to speed level 1 (25 PWM)
-
-// -------------------------------------------------------------------------
 // Motor Initialization
 // -------------------------------------------------------------------------
 
@@ -94,22 +89,22 @@ void setMotorB(int speed, bool forward) {
 // -------------------------------------------------------------------------
 
 void leftMotorForward() {
-  setMotorA(currentSpeed, true);
+  setMotorA(baseSpeed, true);
   // Serial output removed to prevent spam - only used for manual commands via serial
 }
 
 void leftMotorBackward() {
-  setMotorA(currentSpeed, false);
+  setMotorA(baseSpeed, false);
   // Serial output removed to prevent spam - only used for manual commands via serial
 }
 
 void rightMotorForward() {
-  setMotorB(currentSpeed, true);
+  setMotorB(baseSpeed, true);
   // Serial output removed to prevent spam - only used for manual commands via serial
 }
 
 void rightMotorBackward() {
-  setMotorB(currentSpeed, false);
+  setMotorB(baseSpeed, false);
   // Serial output removed to prevent spam - only used for manual commands via serial
 }
 
@@ -118,28 +113,28 @@ void rightMotorBackward() {
 // -------------------------------------------------------------------------
 
 void robotForward() {
-  setMotorA(currentSpeed, true);
-  setMotorB(currentSpeed, true);
+  setMotorA(baseSpeed, true);
+  setMotorB(baseSpeed, true);
   // Serial output removed to prevent spam in loops - use task-level status messages instead
 }
 
 void robotBackward() {
-  setMotorA(currentSpeed, false);
-  setMotorB(currentSpeed, false);
+  setMotorA(baseSpeed, false);
+  setMotorB(baseSpeed, false);
   // Serial output removed to prevent spam in loops - use task-level status messages instead
 }
 
 void robotTurnLeft() {
   // Left motor backward, right motor forward (spin turn)
-  setMotorA(currentSpeed / 2, false);
-  setMotorB(currentSpeed, true);
+  setMotorA(rotateSpeed, false);
+  setMotorB(rotateSpeed, true);
   // Serial output removed to prevent spam in loops - use task-level status messages instead
 }
 
 void robotTurnRight() {
   // Left motor forward, right motor backward (spin turn)
-  setMotorA(currentSpeed, true);
-  setMotorB(currentSpeed / 2, false);
+  setMotorA(rotateSpeed, true);
+  setMotorB(rotateSpeed, false);
   // Serial output removed to prevent spam in loops - use task-level status messages instead
 }
 
@@ -155,30 +150,16 @@ void stopAllMotors() {
 // Speed Control Functions
 // -------------------------------------------------------------------------
 
-void setSpeedLevel(int level) {
-  // Clamp level to valid range (1-12)
-  if (level < 1) level = 1;
-  if (level > speedLevels) level = speedLevels;
-  
-  currentSpeed = mapSpeedLevelToPWM(level);
-  Serial.print("Speed Level Set to: ");
-  Serial.print(level);
-  Serial.print(" (PWM: ");
-  Serial.print(currentSpeed);
-  Serial.println(")");
-}
-
-int getCurrentSpeed() {
-  return currentSpeed;
-}
-
-void setCurrentSpeed(int speed) {
-  currentSpeed = constrain(speed, 0, maxSpeedPWM);
+void setMotorSpeed(int speed) {
+  // Used for directly setting motor speed in specific scenarios
+  speed = constrain(speed, 0, maxSpeed);
+  setMotorA(speed, true);
+  setMotorB(speed, true);
 }
 
 void setLeftMotorSpeed(int speed) {
   // Left motor speed control (Motor A)
-  speed = constrain(speed, 0, maxSpeedPWM);
+  speed = constrain(speed, 0, maxSpeed);
   // Keep current direction, just change speed
   // This will be used in conjunction with robotForward() or other direction commands
   analogWrite(PWMA, speed);
@@ -186,28 +167,17 @@ void setLeftMotorSpeed(int speed) {
 
 void setRightMotorSpeed(int speed) {
   // Right motor speed control (Motor B)
-  speed = constrain(speed, 0, maxSpeedPWM);
+  speed = constrain(speed, 0, maxSpeed);
   // Keep current direction, just change speed
   // This will be used in conjunction with robotForward() or other direction commands
   analogWrite(PWMB, speed);
 }
 
-int mapSpeedLevelToPWM(int level) {
+int getBaseSpeed() {
+  return baseSpeed;
+}
 
-  switch(level) {
-    case 1: return 40;
-    case 2: return 45;
-    case 3: return 50;
-    case 4: return 75;
-    case 5: return 100;
-    case 6: return 200;
-    case 7: return 337;   // 200 + (1023-200)/6 * 1
-    case 8: return 474;   // 200 + (1023-200)/6 * 2
-    case 9: return 611;   // 200 + (1023-200)/6 * 3
-    case 10: return 748;  // 200 + (1023-200)/6 * 4
-    case 11: return 885;  // 200 + (1023-200)/6 * 5
-    case 12: return 1023; // Maximum speed
-    default: return 25;   // Default to level 1
-  }
+int getRotateSpeed() {
+  return rotateSpeed;
 }
 

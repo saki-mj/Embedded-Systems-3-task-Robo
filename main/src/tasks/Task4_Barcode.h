@@ -31,9 +31,6 @@ class Task4Barcode {
     // Configuration parameters (can be changed via serial commands)
     uint16_t wallDetectionDistance;  // Distance to detect wall (mm)
     uint16_t wallFollowDistance;     // Target distance for wall following (mm)
-    uint16_t barcodeSpeed;            // Speed while reading barcode
-    uint16_t approachSpeed;           // Speed while navigating
-    uint16_t turnSpeed;               // Speed while turning
     unsigned long turnRightDuration;  // Time for right turn 90° (ms)
     unsigned long turnLeftDuration;   // Time for left turn 90° (ms)
     unsigned long straightDuration;   // Time for straight movement (ms)
@@ -75,9 +72,6 @@ class Task4Barcode {
     // Configuration setters
     void setWallDetectionDistance(uint16_t distance);
     void setWallFollowDistance(uint16_t distance);
-    void setBarcodeSpeed(uint16_t speed);
-    void setApproachSpeed(uint16_t speed);
-    void setTurnSpeed(uint16_t speed);
     void setTurnRightDuration(unsigned long timeMs);
     void setTurnLeftDuration(unsigned long timeMs);
     void setStraightDuration(unsigned long timeMs);
@@ -87,9 +81,6 @@ class Task4Barcode {
     // Getters for current values
     uint16_t getWallDetectionDistance();
     uint16_t getWallFollowDistance();
-    uint16_t getBarcodeSpeed();
-    uint16_t getApproachSpeed();
-    uint16_t getTurnSpeed();
     unsigned long getTurnRightDuration();
     unsigned long getTurnLeftDuration();
     unsigned long getStraightDuration();

@@ -25,9 +25,6 @@ class Task5Unloading {
     int ballsUnloaded;
     
     // Configuration parameters (can be changed via serial commands)
-    uint16_t navigateSpeed;
-    uint16_t alignSpeed;
-    uint16_t unloadSpeed;
     unsigned long unloadDuration;
     unsigned long alignDuration;
     uint16_t zoneDetectionDistance;
@@ -49,18 +46,12 @@ class Task5Unloading {
     int getBallsUnloaded();
     
     // Configuration setters
-    void setNavigateSpeed(uint16_t speed);
-    void setAlignSpeed(uint16_t speed);
-    void setUnloadSpeed(uint16_t speed);
     void setUnloadDuration(unsigned long timeMs);
     void setAlignDuration(unsigned long timeMs);
     void setZoneDetectionDistance(uint16_t distance);
     void setTargetBallCount(uint16_t count);
     
     // Configuration getters
-    uint16_t getNavigateSpeed();
-    uint16_t getAlignSpeed();
-    uint16_t getUnloadSpeed();
     unsigned long getUnloadDuration();
     unsigned long getAlignDuration();
     uint16_t getZoneDetectionDistance();
