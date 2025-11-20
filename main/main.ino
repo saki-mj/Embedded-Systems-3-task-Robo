@@ -8,8 +8,8 @@
 // -------------------------------------------------------------------------
 // Global Speed Variables
 // -------------------------------------------------------------------------
-int baseSpeed = 100;    // Base speed for forward movement (PWM: 0-1023)
-int rotateSpeed = 80;   // Speed for turning/rotation (PWM: 0-1023)
+int baseSpeed = 70;    // Base speed for forward movement (PWM: 0-1023)
+int rotateSpeed = 50;   // Speed for turning/rotation (PWM: 0-1023)
 #include "src/IRReading.h"
 #include "src/LineFollow.h"
 #include "src/WallFollow.h"
