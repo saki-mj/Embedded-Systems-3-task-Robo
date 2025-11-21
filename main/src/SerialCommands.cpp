@@ -445,6 +445,47 @@ void processSerialCommand(String command) {
     wallFollow.setTargetDistance(dist);
     oledDisplay.show("Wall Follow", "Target: " + String(dist) + "mm");
   }
+  // Task 2 Wall Following Configuration
+  else if (command.startsWith("T2DETECTTHR ")) {
+    uint16_t threshold = command.substring(12).toInt();
+    task2WallFollow.setWallNearThreshold(threshold);
+    Serial.print("T2 Wall near threshold set to: ");
+    Serial.print(threshold);
+    Serial.println(" mm");
+    oledDisplay.show("T2 Detect Thr", String(threshold) + " mm");
+  }
+  else if (command.startsWith("T2ENDTHR ")) {
+    uint16_t threshold = command.substring(9).toInt();
+    task2WallFollow.setWallFarThreshold(threshold);
+    Serial.print("T2 Wall far threshold set to: ");
+    Serial.print(threshold);
+    Serial.println(" mm");
+    oledDisplay.show("T2 End Thr", String(threshold) + " mm");
+  }
+  else if (command.startsWith("T2ENDDELAY ")) {
+    unsigned long delay = command.substring(11).toInt();
+    task2WallFollow.setCornerDelay(delay);
+    Serial.print("T2 Corner delay set to: ");
+    Serial.print(delay);
+    Serial.println(" ms");
+    oledDisplay.show("T2 Corner Delay", String(delay) + " ms");
+  }
+  else if (command.startsWith("T2TURNDUR ")) {
+    unsigned long dur = command.substring(10).toInt();
+    task2WallFollow.setTurnDuration(dur);
+    Serial.print("T2 Turn duration set to: ");
+    Serial.print(dur);
+    Serial.println(" ms");
+    oledDisplay.show("T2 Turn Dur", String(dur) + " ms");
+  }
+  else if (command.startsWith("T2TARGETWALL ")) {
+    uint16_t dist = command.substring(13).toInt();
+    task2WallFollow.setTargetWallDistance(dist);
+    Serial.print("T2 Target wall distance set to: ");
+    Serial.print(dist);
+    Serial.println(" mm");
+    oledDisplay.show("T2 Target Wall", String(dist) + " mm");
+  }
   // Task 4 Barcode Configuration
   else if (command.startsWith("T4WALLDIST ")) {
     uint16_t dist = command.substring(11).toInt();
@@ -787,17 +828,20 @@ void printSerialCommands() {
   Serial.println(")");
   Serial.println();
   Serial.println("Task 2 Wall Follow Configuration:");
-  Serial.print("  T2WALLDIST <mm> - Wall detection distance (");
-  Serial.print(task2WallFollow.getWallDetectionDistance());
+  Serial.print("  T2DETECTTHR <mm> - Wall near threshold (");
+  Serial.print(task2WallFollow.getWallNearThreshold());
   Serial.println(")");
-  Serial.print("  T2TARGETDIST <mm> - Target wall distance (");
-  Serial.print(task2WallFollow.getTargetWallDistance());
+  Serial.print("  T2ENDTHR <mm> - Wall far threshold (");
+  Serial.print(task2WallFollow.getWallFarThreshold());
+  Serial.println(")");
+  Serial.print("  T2ENDDELAY <ms> - Corner delay (");
+  Serial.print(task2WallFollow.getCornerDelay());
   Serial.println(")");
   Serial.print("  T2TURNDUR <ms> - Turn duration for 90° (");
   Serial.print(task2WallFollow.getTurnDuration());
   Serial.println(")");
-  Serial.print("  T2ALIGNDUR <ms> - Alignment duration (");
-  Serial.print(task2WallFollow.getAlignDuration());
+  Serial.print("  T2TARGETWALL <mm> - Target wall distance (");
+  Serial.print(task2WallFollow.getTargetWallDistance());
   Serial.println(")");
   Serial.println();
   Serial.println("Task 3 Ramp Configuration:");
