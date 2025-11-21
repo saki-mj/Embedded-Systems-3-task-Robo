@@ -857,6 +857,9 @@ void printSerialCommands() {
   Serial.print("  T3TOPTHRESH <mm> - Top detection threshold (");
   Serial.print(task3Ramp.getTopDetectionThreshold());
   Serial.println(")");
+  Serial.print("  T3TURNDUR <ms> - Turn duration for 90° (");
+  Serial.print(task3Ramp.getTurnDuration());
+  Serial.println(")");
   Serial.println();
   Serial.println("Task 4 Barcode Configuration:");
   Serial.print("  T4WALLDIST <mm> - Wall detection distance (");

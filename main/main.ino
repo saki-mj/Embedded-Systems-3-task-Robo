@@ -8,11 +8,9 @@
 // -------------------------------------------------------------------------
 // Global Speed Variables
 // -------------------------------------------------------------------------
-int baseSpeed = 70;    // Base speed for forward movement (PWM: 0-1023)
-int rotateSpeed = 50;   // Speed for turning/rotation (PWM: 0-1023)
-=======
-int rotateSpeed = 60;   // Speed for turning/rotation (PWM: 0-1023)
->>>>>>> Stashed changes
+int baseSpeed = 350;  // Base speed for forward movement (PWM: 0-1023)
+int rotateSpeed = 350;  // Speed for turning/rotation (PWM: 0-1023)
+
 #include "src/IRReading.h"
 #include "src/LineFollow.h"
 #include "src/WallFollow.h"
@@ -28,11 +26,8 @@ int rotateSpeed = 60;   // Speed for turning/rotation (PWM: 0-1023)
 #include "src/tasks/Task4_Barcode.h"
 #include "src/tasks/Task5_Unloading.h"
 #include "src/tasks/BallCollector.h"
-<<<<<<< Updated upstream
-=======
 #include "src/Gyroscope.h"
 #include "src/LED.h"
->>>>>>> Stashed changes
 
 // -------------------------------------------------------------------------
 // Activity Tracking for QR Code Display
@@ -78,6 +73,9 @@ void setup() {
   
   // Initialize external LEDs
   initLED();
+  
+  // Initialize gyroscope
+  initGyroscope();
   
   // Initialize line following
   initLineFollow();
