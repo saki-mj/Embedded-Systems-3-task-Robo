@@ -23,11 +23,11 @@ Task2WallFollow::Task2WallFollow() {
   stateMessagePrinted = false;
   
   // Default configuration (can be changed via serial commands)
-  wallNearThreshold = 70;       // mm - distance to detect wall nearby
-  wallFarThreshold = 100;       // mm - distance to detect wall ended
-  cornerDelay = 1500;           // ms - delay after corner detected
-  turnDuration = 1000;          // ms - duration for 90° turn
-  targetWallDistance = 85;      // mm - target distance to maintain
+  wallNearThreshold = 200;       // mm - distance to detect wall nearby
+  wallFarThreshold = 150;        // mm - distance to detect wall ended
+  cornerDelay = 1500;            // ms - delay after corner detected
+  turnDuration = 3500;           // ms - duration for 90° turn
+  targetWallDistance = 85;       // mm - target distance to maintain
   
   lastError = 0;
 }
