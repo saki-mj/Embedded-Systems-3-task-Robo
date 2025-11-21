@@ -33,6 +33,7 @@ class Task3Ramp {
     uint16_t rampDetectionDistance;
     uint16_t topDetectionThreshold;
     unsigned long turnDuration;  // Duration for 90° turn
+    unsigned long stateChangeInterval;  // Minimum time between state changes (ms)
 
   public:
     Task3Ramp();
@@ -54,6 +55,7 @@ class Task3Ramp {
     void setRampDetectionDistance(uint16_t distance);
     void setTopDetectionThreshold(uint16_t threshold);
     void setTurnDuration(unsigned long timeMs);
+    void setStateChangeInterval(unsigned long timeMs);
     
     // Configuration getters
     unsigned long getClimbDuration();
@@ -61,6 +63,7 @@ class Task3Ramp {
     uint16_t getRampDetectionDistance();
     uint16_t getTopDetectionThreshold();
     unsigned long getTurnDuration();
+    unsigned long getStateChangeInterval();
 };
 
 extern Task3Ramp task3Ramp;

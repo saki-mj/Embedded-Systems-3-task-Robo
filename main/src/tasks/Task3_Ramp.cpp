@@ -30,6 +30,7 @@ Task3Ramp::Task3Ramp() {
   rampDetectionDistance = 100;  // mm
   topDetectionThreshold = 300;  // TOF reading at top
   turnDuration = 1000;  // 1 second for 90° turn
+  stateChangeInterval = 2000;  // 2 seconds minimum between state changes
 }
 
 void Task3Ramp::init() {
@@ -67,17 +68,17 @@ void Task3Ramp::execute() {
       
     case T3_APPROACH:
       if (!stateMessagePrinted) {
-        Serial.println("Task 3: APPROACH - Going forward until pitch > +3 degrees");
+        Serial.println("Task 3: APPROACH - Going forward at 2x base speed");
         stateMessagePrinted = true;
       }
       
-      // Go forward at base speed
-      setLeftMotorSpeed(getBaseSpeed());
-      setRightMotorSpeed(getBaseSpeed());
+      // Go forward at 2x base speed
+      setLeftMotorSpeed(getBaseSpeed() * 2);
+      setRightMotorSpeed(getBaseSpeed() * 2);
       robotForward();
       
-      // Check if ramp is detected (pitch > +3 degrees)
-      if (pitch > 3.0) {
+      // Check if ramp is detected (pitch > +7 degrees) and minimum interval passed
+      if (pitch > 7.0 && (millis() - subStateStartTime >= stateChangeInterval)) {
         Serial.print("Ramp detected! Pitch: ");
         Serial.println(pitch);
         setSubState(T3_CLIMBING);
@@ -86,17 +87,17 @@ void Task3Ramp::execute() {
       
     case T3_CLIMBING:
       if (!stateMessagePrinted) {
-        Serial.println("Task 3: CLIMBING - Speed = 2x base speed until stable");
+        Serial.println("Task 3: CLIMBING - Speed = 1023 (maximum) until stable");
         stateMessagePrinted = true;
       }
       
-      // Climb at 2x base speed
-      setLeftMotorSpeed(getBaseSpeed() * 2);
-      setRightMotorSpeed(getBaseSpeed() * 2);
+      // Climb at maximum speed (1023)
+      setLeftMotorSpeed(1023);
+      setRightMotorSpeed(1023);
       robotForward();
       
-      // Check if reached top (pitch returns to stable, near 0 degrees)
-      if (pitch >= -3.0 && pitch <= 3.0) {
+      // Check if reached top (pitch drops below 8 degrees) and minimum interval passed
+      if (pitch < 8.0 && (millis() - subStateStartTime >= stateChangeInterval)) {
         Serial.print("Top reached! Pitch stabilized: ");
         Serial.println(pitch);
         setSubState(T3_AT_TOP);
@@ -114,8 +115,8 @@ void Task3Ramp::execute() {
       setRightMotorSpeed(getBaseSpeed());
       robotForward();
       
-      // Check if descending (pitch < -3 degrees)
-      if (pitch < -3.0) {
+      // Check if descending (pitch < -10 degrees) and minimum interval passed
+      if (pitch < -10.0 && (millis() - subStateStartTime >= stateChangeInterval)) {
         Serial.print("Descending detected! Pitch: ");
         Serial.println(pitch);
         setSubState(T3_DESCENDING);
@@ -133,8 +134,8 @@ void Task3Ramp::execute() {
       setRightMotorSpeed(getBaseSpeed() * 0.25);
       robotForward();
       
-      // Check if stable again (pitch returns to near 0 degrees)
-      if (pitch >= -3.0 && pitch <= 3.0) {
+      // Check if stable again (pitch returns above -8 degrees) and minimum interval passed
+      if (pitch > -8.0 && (millis() - subStateStartTime >= stateChangeInterval)) {
         Serial.print("Stable ground reached! Pitch: ");
         Serial.println(pitch);
         setSubState(T3_AFTER_RAMP);
@@ -153,7 +154,7 @@ void Task3Ramp::execute() {
       robotForward();
       
       uint16_t frontDist = tofSensors.getFrontDistance();
-      if (frontDist < 70) {
+      if (frontDist < 70 && (millis() - subStateStartTime >= stateChangeInterval)) {
         Serial.print("Front wall detected at ");
         Serial.print(frontDist);
         Serial.println(" mm");
@@ -333,6 +334,13 @@ void Task3Ramp::setTurnDuration(unsigned long timeMs) {
   Serial.println(" ms");
 }
 
+void Task3Ramp::setStateChangeInterval(unsigned long timeMs) {
+  stateChangeInterval = timeMs;
+  Serial.print("T3 State change interval set to: ");
+  Serial.print(timeMs);
+  Serial.println(" ms");
+}
+
 // Configuration getters
 unsigned long Task3Ramp::getClimbDuration() {
   return climbDuration;
@@ -352,4 +360,8 @@ uint16_t Task3Ramp::getTopDetectionThreshold() {
 
 unsigned long Task3Ramp::getTurnDuration() {
   return turnDuration;
+}
+
+unsigned long Task3Ramp::getStateChangeInterval() {
+  return stateChangeInterval;
 }
