@@ -478,31 +478,13 @@ void processSerialCommand(String command) {
     Serial.println(" ms");
     oledDisplay.show("T2 Turn Dur", String(dur) + " ms");
   }
-  // Task 3 Ramp Configuration
-  else if (command.startsWith("T3CLIMBDUR ")) {
-    unsigned long dur = command.substring(11).toInt();
-    task3Ramp.setClimbDuration(dur);
-    oledDisplay.show("T3 Climb Dur", String(dur) + " ms");
-  }
-  else if (command.startsWith("T3DESCDUR ")) {
-    unsigned long dur = command.substring(10).toInt();
-    task3Ramp.setDescendDuration(dur);
-    oledDisplay.show("T3 Desc Dur", String(dur) + " ms");
-  }
-  else if (command.startsWith("T3RAMPDIST ")) {
-    uint16_t dist = command.substring(11).toInt();
-    task3Ramp.setRampDetectionDistance(dist);
-    oledDisplay.show("T3 Ramp Dist", String(dist) + " mm");
-  }
-  else if (command.startsWith("T3TOPTHRESH ")) {
-    uint16_t thresh = command.substring(12).toInt();
-    task3Ramp.setTopDetectionThreshold(thresh);
-    oledDisplay.show("T3 Top Thresh", String(thresh) + " mm");
-  }
-  else if (command.startsWith("T3TURNDUR ")) {
-    unsigned long dur = command.substring(10).toInt();
-    task3Ramp.setTurnDuration(dur);
-    oledDisplay.show("T3 Turn Dur", String(dur) + " ms");
+  else if (command.startsWith("T2TARGETWALL ")) {
+    uint16_t dist = command.substring(13).toInt();
+    task2WallFollow.setTargetWallDistance(dist);
+    Serial.print("T2 Target wall distance set to: ");
+    Serial.print(dist);
+    Serial.println(" mm");
+    oledDisplay.show("T2 Target Wall", String(dist) + " mm");
   }
   // Task 4 Barcode Configuration
   else if (command.startsWith("T4WALLDIST ")) {
@@ -857,6 +839,9 @@ void printSerialCommands() {
   Serial.println(")");
   Serial.print("  T2TURNDUR <ms> - Turn duration for 90° (");
   Serial.print(task2WallFollow.getTurnDuration());
+  Serial.println(")");
+  Serial.print("  T2TARGETWALL <mm> - Target wall distance (");
+  Serial.print(task2WallFollow.getTargetWallDistance());
   Serial.println(")");
   Serial.println();
   Serial.println("Task 3 Ramp Configuration:");
