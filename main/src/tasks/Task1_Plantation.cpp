@@ -19,7 +19,7 @@
 /**********************************************************************/
 
 #include "Task1_Plantation.h"
-// #include "BallCollector.h"   // Not used in this version
+//#include "BallCollector.h"   // Not used in this version
 #include "../Motors.h"
 #include "../IRReading.h"
 #include "../LineFollow.h"
@@ -56,6 +56,10 @@ const int T1_INTERSECTIONS_PER_LINE   = 3;   // 3 intersections in each vertical
 const int T1_NUM_LINES                = 4;   // 4 vertical lines total
 // T1_INTERSECTION_WHITE_MIN is defined above with other tunable parameters
 
+// NEW: default Task1 speed level (1..12) for SerialCommands.cpp
+// NOTE: This value is initialized here, but is updated at runtime via serial commands.
+uint8_t T1_SPEED_LEVEL = 6;  // Default mid-level (updated by serial commands)
+
 // State for current plantation sweep
 static T1TurnCommand  t1PendingTurn        = T1_TURN_NONE;
 static Task1SubState  t1NextStateAfterTurn = T1_LINE_FOLLOWING;
@@ -91,12 +95,6 @@ void T1_setExitForwardTime(unsigned long ms) {
   Serial.println(ms);
 }
 
-void T1_setSpeedLevel(int level) {
-  T1_SPEED_LEVEL = level;
-  Serial.print("Updated T1 Speed Level: ");
-  Serial.println(level);
-}
-
 void T1_setIntersectionWhiteMin(int min) {
   T1_INTERSECTION_WHITE_MIN = min;
   Serial.print("Updated T1 Intersection White Min: ");
@@ -121,9 +119,9 @@ Task1Plantation::Task1Plantation() {
 // Initialize task
 void Task1Plantation::init() {
   Serial.println("=== Task 1: Plantation - Initializing ===");
-  currentSubState = T1_INIT;
+  currentSubState   = T1_INIT;
   subStateStartTime = millis();
-  taskActive = false;
+  taskActive        = false;
 
   // Reset plantation sweep state
   t1PendingTurn        = T1_TURN_NONE;
@@ -191,28 +189,27 @@ void Task1Plantation::execute() {
         Serial.println("Task 1: main line detected, prepare 90 deg right");
         stopAllMotors();
         t1PendingTurn        = T1_TURN_RIGHT_90;
-        t1NextStateAfterTurn = T1_FOLLOWING;   // backup 1 s then line follow on line 1
+        t1NextStateAfterTurn = T1_BACKUP_AFTER_TURN;   // backup then line follow on line 1
         setSubState(T1_TURNING);
       }
       break;
     }
 
     // -----------------------------------------------------------
-    // 3) FOLLOWING (used here as "BACKUP then go to LINE_FOLLOWING")
-    //    - after each 90° turn into a vertical line: go back 1000 ms
+    // 3) BACKUP_AFTER_TURN:
+    //    - after each 90° turn into a vertical line: go back for T1_BACKUP_TIME_MS
     // -----------------------------------------------------------
-    case T1_FOLLOWING: {
+    case T1_BACKUP_AFTER_TURN: {
       unsigned long elapsed = millis() - subStateStartTime;
 
       if (elapsed < T1_BACKUP_TIME_MS) {
-        // "robo car come back 1000ms"
         robotBackward();
       } else {
-        // Backup finished -> start moving forward along current line
-        Serial.println("Task 1: backup done, start LINE_FOLLOWING on line");
-        t1IntersectionCount    = 0;
-        t1ReturningAlongLine   = false;  // going DOWN the line
-        t1IntersectionLatched  = false;
+        stopAllMotors();
+        Serial.println("Turn + Backup done → starting line following");
+        t1IntersectionCount   = 1; // already on first intersection after turn
+        t1ReturningAlongLine  = false;
+        t1IntersectionLatched = false;
 
         setSubState(T1_LINE_FOLLOWING);
       }
@@ -250,8 +247,9 @@ void Task1Plantation::execute() {
 
         case T1_TURN_180:
           if (elapsed < T1_TURN_180_TIME_MS) {
-            // 180° = spin in place; reuse right spin
-            robotTurnRight();
+            // 180° = spin in place; both motors in opposite directions
+            leftMotorForward();   // or setLeftMotor(FORWARD, speed);
+            rightMotorBackward(); // or setRightMotor(BACKWARD, speed);
           } else {
             stopAllMotors();
             Serial.println("Task 1: 180 deg turn finished");
@@ -334,7 +332,7 @@ void Task1Plantation::execute() {
             t1PendingTurn        = T1_TURN_180;
             t1NextStateAfterTurn = T1_LINE_FOLLOWING;   // continue but in reverse direction
             t1ReturningAlongLine = true;                // now we are "coming back up"
-            t1IntersectionCount  = 0;                   // recount intersections on way back
+            t1IntersectionCount  = 1;                   // already on first intersection after turn
             setSubState(T1_TURNING);
             break;
           }
@@ -361,8 +359,8 @@ void Task1Plantation::execute() {
               // ignores it until the robot leaves it.
               t1IntersectionLatched = true;
 
-              t1PendingTurn        = T1_TURN_RIGHT_90;       // first 90° right at top intersection
-              t1NextStateAfterTurn = T1_MOVE_TO_NEXT_LINE;   // then move along top corridor
+              t1PendingTurn        = T1_TURN_RIGHT_90;         // first 90° right at top intersection
+              t1NextStateAfterTurn = T1_MOVE_TO_NEXT_LINE;     // then move along top corridor
             } else {
               // Last line finished -> go to exit
               Serial.println("  Finished last line -> exit to right and forward 3000ms");
@@ -391,7 +389,7 @@ void Task1Plantation::execute() {
     //    - after finishing a line and turning right at top intersection,
     //      follow the top horizontal line until the next intersection,
     //      then turn right 90° into the new vertical line and
-    //      go to T1_FOLLOWING (backup 1000 ms).
+    //      go to T1_BACKUP_AFTER_TURN (backup 1000 ms).
     // -----------------------------------------------------------
     case T1_MOVE_TO_NEXT_LINE: {
       // Follow the top corridor line
@@ -399,6 +397,7 @@ void Task1Plantation::execute() {
 
       readAllIRSensorsBinary();
       int whiteCount = 0;
+      // BUGFIX: proper loop condition i < NUM_IR_SENSORS
       for (int i = 0; i < NUM_IR_SENSORS; i++) {
         if (irBinary[i] == 1) whiteCount++;
       }
@@ -412,8 +411,8 @@ void Task1Plantation::execute() {
         Serial.println(t1CurrentLine + 1);
 
         stopAllMotors();
-        t1PendingTurn        = T1_TURN_RIGHT_90;  // turn into the new vertical line
-        t1NextStateAfterTurn = T1_FOLLOWING;      // then backup 1000 ms and start line following
+        t1PendingTurn        = T1_TURN_RIGHT_90;        // turn into the new vertical line
+        t1NextStateAfterTurn = T1_BACKUP_AFTER_TURN;    // then backup and start line following
         setSubState(T1_TURNING);
       }
       else if (!intersectionNow && t1IntersectionLatched) {
@@ -487,7 +486,7 @@ void Task1Plantation::updateDisplay() {
 // Set sub-state
 void Task1Plantation::setSubState(Task1SubState newSubState) {
   if (currentSubState != newSubState) {
-    currentSubState = newSubState;
+    currentSubState   = newSubState;
     subStateStartTime = millis();
     
     Serial.print("Task 1 sub-state -> ");
@@ -504,23 +503,40 @@ Task1SubState Task1Plantation::getSubState() {
 // Get sub-state name
 String Task1Plantation::getSubStateName() {
   switch(currentSubState) {
-    case T1_INIT:            return "INIT";
-    case T1_SEARCHING:       return "SEARCHING";
-    case T1_FOLLOWING:       return "BACKUP_ON_LINE";
-    case T1_TURNING:         return "TURNING";
-    case T1_LINE_FOLLOWING:  return "LINE_FOLLOWING";
-    case T1_MOVE_TO_NEXT_LINE:return "MOVE_TO_NEXT_LINE";
-    case T1_EXIT_FORWARD:    return "EXIT_FORWARD";
-    case T1_COLLECTING:      return "COLLECTING";
-    case T1_PLANTING:        return "PLANTING";
-    case T1_COMPLETED:       return "COMPLETED";
-    default:                 return "UNKNOWN";
+    case T1_INIT:               return "INIT";
+    case T1_SEARCHING:          return "SEARCHING";
+    case T1_BACKUP_AFTER_TURN:  return "BACKUP_AFTER_TURN";
+    case T1_FOLLOWING:          return "BACKUP_ON_LINE"; // legacy
+    case T1_TURNING:            return "TURNING";
+    case T1_LINE_FOLLOWING:     return "LINE_FOLLOWING";
+    case T1_MOVE_TO_NEXT_LINE:  return "MOVE_TO_NEXT_LINE";
+    case T1_EXIT_FORWARD:       return "EXIT_FORWARD";
+    case T1_COLLECTING:         return "COLLECTING";
+    case T1_PLANTING:           return "PLANTING";
+    case T1_COMPLETED:          return "COMPLETED";
+    default:                    return "UNKNOWN";
   }
 }
 
 // Start task
 void Task1Plantation::start() {
   Serial.println("Starting Task 1: Plantation");
+  
+  // Recalculate speeds based on current robot base speed
+  int baseSpeed = getCurrentSpeed();
+  searchSpeed   = baseSpeed * searchSpeedMultiplier;
+  followSpeed   = baseSpeed * followSpeedMultiplier;
+  turnSpeed     = baseSpeed * turnSpeedMultiplier;
+  
+  Serial.print("Task1 using base speed: ");
+  Serial.print(baseSpeed);
+  Serial.print(" -> Search: ");
+  Serial.print(searchSpeed);
+  Serial.print(", Follow: ");
+  Serial.print(followSpeed);
+  Serial.print(", Turn: ");
+  Serial.println(turnSpeed);
+  
   taskActive = true;
   setSubState(T1_INIT);
 }
@@ -544,9 +560,9 @@ bool Task1Plantation::isCompleted() {
 
 // Reset task
 void Task1Plantation::reset() {
-  currentSubState = T1_INIT;
+  currentSubState   = T1_INIT;
   subStateStartTime = millis();
-  taskActive = false;
+  taskActive        = false;
 }
 
 // Configuration setters
@@ -592,4 +608,51 @@ unsigned long Task1Plantation::getCollectDuration() {
 
 uint16_t Task1Plantation::getBallDetectionThreshold() {
   return ballDetectionThreshold;
+}
+
+// Speed multiplier setters
+void Task1Plantation::setSearchSpeedMultiplier(float mult) {
+  searchSpeedMultiplier = mult;
+  int baseSpeed = getCurrentSpeed();
+  searchSpeed   = baseSpeed * searchSpeedMultiplier;
+  Serial.print("T1 Search speed multiplier set to: ");
+  Serial.print(mult, 2);
+  Serial.print("x (speed: ");
+  Serial.print(searchSpeed);
+  Serial.println(")");
+}
+
+void Task1Plantation::setFollowSpeedMultiplier(float mult) {
+  followSpeedMultiplier = mult;
+  int baseSpeed = getCurrentSpeed();
+  followSpeed   = baseSpeed * followSpeedMultiplier;
+  Serial.print("T1 Follow speed multiplier set to: ");
+  Serial.print(mult, 2);
+  Serial.print("x (speed: ");
+  Serial.print(followSpeed);
+  Serial.println(")");
+}
+
+void Task1Plantation::setTurnSpeedMultiplier(float mult) {
+  turnSpeedMultiplier = mult;
+  int baseSpeed = getCurrentSpeed();
+  turnSpeed     = baseSpeed * turnSpeedMultiplier;
+  Serial.print("T1 Turn speed multiplier set to: ");
+  Serial.print(mult, 2);
+  Serial.print("x (speed: ");
+  Serial.print(turnSpeed);
+  Serial.println(")");
+}
+
+// Speed multiplier getters
+float Task1Plantation::getSearchSpeedMultiplier() {
+  return searchSpeedMultiplier;
+}
+
+float Task1Plantation::getFollowSpeedMultiplier() {
+  return followSpeedMultiplier;
+}
+
+float Task1Plantation::getTurnSpeedMultiplier() {
+  return turnSpeedMultiplier;
 }
