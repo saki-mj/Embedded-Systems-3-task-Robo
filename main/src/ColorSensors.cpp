@@ -256,7 +256,36 @@ DetectedColor ColorSensors::classifyColor(uint16_t r, uint16_t g, uint16_t b, ui
 }
 
 DetectedColor ColorSensors::getBottomColor() {
-  return classifyColor(bottomData.r, bottomData.g, bottomData.b, bottomData.c);
+  // Bottom sensor only needs to detect: BLACK, GREEN, WHITE
+  // Based on calibration data:
+  // Black:  R~321,  G~276,  B~187,  C~749
+  // Green:  R~1598, G~2125, B~1239, C~3960
+  // White:  R~5272, G~4955, B~3331, C~13620
+  
+  uint16_t c = bottomData.c;
+  uint16_t g = bottomData.g;
+  uint16_t r = bottomData.r;
+  
+  // BLACK detection: C < 1500
+  if (c < 1500) {
+    return COLOR_BLACK;
+  }
+  
+  // WHITE detection: C > 8000
+  if (c > 8000) {
+    return COLOR_WHITE;
+  }
+  
+  // GREEN detection: C in range 2000-6000 AND G is dominant
+  // Green should have G > R and G > B with G being significantly higher
+  if (c >= 2000 && c <= 6000) {
+    if (g > r * 1.2 && g > bottomData.b * 1.5) {
+      return COLOR_GREEN;
+    }
+  }
+  
+  // Default to unknown if not clearly one of the three
+  return COLOR_UNKNOWN;
 }
 
 DetectedColor ColorSensors::getTopColor() {
@@ -295,7 +324,42 @@ DetectedColor ColorSensors::getTopColor() {
 }
 
 DetectedColor ColorSensors::getBackColor() {
-  return classifyColor(backData.r, backData.g, backData.b, backData.c);
+  // Back sensor only needs to detect: RED vs BLUE
+  // Based on calibration data:
+  // Red:  R~221, G~88,  B~69,  C~370,  Temp~3261K
+  // Blue: R~95,  G~98,  B~100, C~251,  Temp~9965K
+  
+  uint16_t r = backData.r;
+  uint16_t g = backData.g;
+  uint16_t b = backData.b;
+  uint16_t temp = backData.colorTemp;
+  
+  // Use color temperature as primary discriminator:
+  // Red: ~3261K (warm)
+  // Blue: ~9965K (cool)
+  
+  if (temp < 6000) {
+    // Warm temperature = RED
+    // Also verify R is dominant
+    if (r > g * 1.5 && r > b * 2.0) {
+      return COLOR_RED;
+    }
+  } else {
+    // Cool temperature = BLUE
+    // Also verify RGB values are balanced (blue surface reflects all colors)
+    if (abs(r - g) < 20 && abs(g - b) < 20) {
+      return COLOR_BLUE;
+    }
+  }
+  
+  // Fallback: use RGB ratios if temperature is inconclusive
+  if (r > g && r > b && r > g * 1.5) {
+    return COLOR_RED;
+  } else if (abs(r - g) < 30 && abs(g - b) < 30) {
+    return COLOR_BLUE;
+  }
+  
+  return COLOR_UNKNOWN;
 }
 
 String ColorSensors::getColorName(DetectedColor color) {
