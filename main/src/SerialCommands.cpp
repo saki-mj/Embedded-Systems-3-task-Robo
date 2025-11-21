@@ -478,6 +478,14 @@ void processSerialCommand(String command) {
     Serial.println(" ms");
     oledDisplay.show("T2 Turn Dur", String(dur) + " ms");
   }
+  else if (command.startsWith("T2TARGETWALL ")) {
+    uint16_t dist = command.substring(13).toInt();
+    task2WallFollow.setTargetWallDistance(dist);
+    Serial.print("T2 Target wall distance set to: ");
+    Serial.print(dist);
+    Serial.println(" mm");
+    oledDisplay.show("T2 Target Wall", String(dist) + " mm");
+  }
   // Task 4 Barcode Configuration
   else if (command.startsWith("T4WALLDIST ")) {
     uint16_t dist = command.substring(11).toInt();
@@ -831,6 +839,9 @@ void printSerialCommands() {
   Serial.println(")");
   Serial.print("  T2TURNDUR <ms> - Turn duration for 90° (");
   Serial.print(task2WallFollow.getTurnDuration());
+  Serial.println(")");
+  Serial.print("  T2TARGETWALL <mm> - Target wall distance (");
+  Serial.print(task2WallFollow.getTargetWallDistance());
   Serial.println(")");
   Serial.println();
   Serial.println("Task 3 Ramp Configuration:");
