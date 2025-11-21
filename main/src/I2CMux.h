@@ -8,8 +8,8 @@
 #define PCA9548A_ADDRESS 0x70
 
 // ESP32-S3 I2C Pins
-#define I2C_SDA_PIN 8
-#define I2C_SCL_PIN 9
+#define I2C_SDA_PIN 21
+#define I2C_SCL_PIN 22
 #define I2C_FREQ 100000  // 100kHz standard mode (can use 400000 for fast mode)
 
 // I2C Multiplexer Channels
