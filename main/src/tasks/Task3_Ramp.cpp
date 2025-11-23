@@ -26,12 +26,12 @@ Task3Ramp::Task3Ramp() {
   stateMessagePrinted = false;
   
   // Default configuration (can be changed via serial commands)
-  climbDuration = 3000;  // 3 seconds climb time
-  descendDuration = 2500;  // 2.5 seconds descend time
+  climbDuration = 100;  // 3 seconds climb time
+  descendDuration = 200;  // 2.5 seconds descend time
   rampDetectionDistance = 100;  // mm
   topDetectionThreshold = 300;  // TOF reading at top
-  turnDuration = 1000;  // 1 second for 90° turn
-  stateChangeInterval = 2000;  // 2 seconds minimum between state changes
+  turnDuration = 2000;  //  0second for 90° turn
+  stateChangeInterval = 25;  // 2 seconds minimum between state changes
 }
 
 void Task3Ramp::init() {
@@ -88,18 +88,17 @@ void Task3Ramp::execute() {
       
     case T3_CLIMBING:
       if (!stateMessagePrinted) {
-        Serial.println("Task 3: CLIMBING - Speed = 1023 (maximum) until stable");
+        Serial.println("Task 3: CLIMBING - Speed = 600 only when pitch > 8.0");
         stateMessagePrinted = true;
       }
       
-      // Climb at maximum speed (1023)
-      setLeftMotorSpeed(1023);
-      setRightMotorSpeed(1023);
-      robotForward();
-      
-      // Check if reached top (pitch drops below 8 degrees) and minimum interval passed
-      if (pitch < 8.0 && (millis() - subStateStartTime >= stateChangeInterval)) {
-        Serial.print("Top reached! Pitch stabilized: ");
+      // Climb at high speed only when pitch > 8.0
+      if (pitch > 8.0) {
+        setMotorA(600, true);  // Left motor forward at high speed
+        setMotorB(600, true);  // Right motor forward at high speed
+      } else {
+        // Immediately transition to AT_TOP when pitch drops below 8.0
+        Serial.print("Top reached! Pitch dropped below 8.0: ");
         Serial.println(pitch);
         setSubState(T3_AT_TOP);
       }
@@ -124,24 +123,25 @@ void Task3Ramp::execute() {
       }
       break;
       
-    case T3_DESCENDING:
+    case T3_DESCENDING: {
       if (!stateMessagePrinted) {
-        Serial.println("Task 3: DESCENDING - Speed = 0.25x base speed until stable");
+        Serial.println("Task 3: DESCENDING - Speed = 0.25x base speed until flat");
         stateMessagePrinted = true;
       }
       
-      // Descend at 0.25x base speed (slower for control)
-      setLeftMotorSpeed(getBaseSpeed() * 0.25);
-      setRightMotorSpeed(getBaseSpeed() * 0.25);
-      robotForward();
+      // Descend at 0.25x base speed (slower for control) - use setMotorA/B directly
+      int descendSpeed = getBaseSpeed() * 0.25;
+      setMotorA(descendSpeed, true);  // Left motor forward at reduced speed
+      setMotorB(descendSpeed, true);  // Right motor forward at reduced speed
       
-      // Check if stable again (pitch returns above -8 degrees) and minimum interval passed
-      if (pitch > -8.0 && (millis() - subStateStartTime >= stateChangeInterval)) {
-        Serial.print("Stable ground reached! Pitch: ");
+      // Immediately transition when pitch becomes flat (above -8 degrees)
+      if (pitch > -8.0) {
+        Serial.print("Flat ground detected! Pitch: ");
         Serial.println(pitch);
         setSubState(T3_AFTER_RAMP);
       }
       break;
+    }
       
     case T3_AFTER_RAMP: {
       if (!stateMessagePrinted) {
@@ -150,8 +150,8 @@ void Task3Ramp::execute() {
       }
       
       // Go forward at base speed
-      setLeftMotorSpeed(getBaseSpeed());
-      setRightMotorSpeed(getBaseSpeed());
+      setLeftMotorSpeed(getBaseSpeed()*0.7);
+      setRightMotorSpeed(getBaseSpeed()*0.7);
       robotForward();
       
       // Wait for state change interval before moving to next state
@@ -228,7 +228,7 @@ void Task3Ramp::execute() {
       bool whiteOnEdge = (irValues[0] > 2000) || (irValues[1] > 2000);
       
       // If white detected on edge sensors and enough time since last correction
-      if (whiteOnEdge && (millis() - lastCorrectionTime > 300)) {
+      if (whiteOnEdge && (millis() - lastCorrectionTime > 100)) {
         Serial.println("White line detected on edge - correcting left");
         
         // Quick left correction: 0.2 * turnDuration
@@ -236,8 +236,8 @@ void Task3Ramp::execute() {
         
         setLeftMotorSpeed(getRotateSpeed());
         setRightMotorSpeed(getRotateSpeed());
-        leftMotorBackward();
-        rightMotorForward();
+        leftMotorForward();
+        rightMotorBackward();
         
         delay(correctionTime);
         

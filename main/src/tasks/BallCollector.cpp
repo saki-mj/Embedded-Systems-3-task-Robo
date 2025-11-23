@@ -25,7 +25,7 @@ BallCollector::BallCollector() {
   
   // Default servo positions (PLACEHOLDER VALUES - TO BE CALIBRATED)
   armPos0 = 125;      // Arm home position
-  armPos1 = 22;       // Arm pickup position
+  armPos1 = 30;       // Arm pickup position
   gripperPos0 = 0;    // Gripper open
   gripperPos1 = 180;  // Gripper closed
   gripperInitialPos = 130;  // Gripper initial position
