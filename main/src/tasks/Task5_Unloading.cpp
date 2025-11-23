@@ -10,6 +10,7 @@
 #include "../Motors.h"
 #include "../TOFSensors.h"
 #include "../OLEDDisplay.h"
+#include "../ColorSensors.h"
 #include "BallCollector.h" // for servo positions & testServo()
 
 extern Task5Unloading task5Unloading;
@@ -374,66 +375,191 @@ void Task5Unloading::execute() {
       break;
     }
 
-    // UNLOADING – non-blocking servo sequence
+    // UNLOADING – display barcode info and proceed to backup sequence
     case T5_UNLOADING: {
-      // If we've already unloaded required number, go to VERIFY
-      if (ballsUnloaded >= (int)targetBallCount) {
-        Serial.println("Task 5: target ball count reached -> VERIFY");
-        setSubState(T5_VERIFY);
-        break;
+      Serial.println("Task 5: UNLOADING - Displaying barcode info");
+      Serial.print("Barcode Value: ");
+      Serial.print(barcodeValue);
+      Serial.print(" (Binary: ");
+      Serial.print(barcodeBinary);
+      Serial.print(") - ");
+      Serial.println((barcodeValue % 2 == 0) ? "EVEN" : "ODD");
+      
+      // Show barcode on OLED
+      oledDisplay.show(
+        "Task 5: Unload",
+        "Val: " + String(barcodeValue) + " (" + String((barcodeValue % 2 == 0) ? "Even" : "Odd") + ")",
+        "Bin: " + barcodeBinary
+      );
+      
+      delay(1000);  // Show barcode for 1 second
+      setSubState(T5_BACKUP_AFTER_ALIGN);
+      break;
+    }
+    
+    // BACKUP_AFTER_ALIGN - backup for 1000ms
+    case T5_BACKUP_AFTER_ALIGN: {
+      unsigned long elapsed = millis() - subStateStartTime;
+      if (elapsed == 0) {
+        Serial.println("Task 5: BACKUP_AFTER_ALIGN - backing up for 1000ms");
       }
-
-      // Start sequence if idle
-      if (unloadStep == US_IDLE) {
-        hasSortedThisCycle = true;
-
-        // decide target basket using barcode parity + quality
-        targetBasket = chooseBasket();
-
-        Serial.print("Task 5: UNLOADING -> target basket: ");
-        Serial.println((targetBasket == BASKET_RED) ? "RED" : "BLUE");
-
-        int servoHome = ballCollector.getSortingPos1();
-        int servoBlue = ballCollector.getSortingPos0();
-        int servoRed  = ballCollector.getSortingPos2();
-
-        int targetAngle = (targetBasket == BASKET_BLUE) ? servoBlue : servoRed;
-
-        // Move to target (we assume ballCollector.testServo schedules/sets position)
-        ballCollector.testServo("SORTING", targetAngle);
-
-        // Wait for mechanical movement duration (non-blocking)
-        unloadStep = US_MOVED_TO_TARGET;
-        stepEndTime = millis() + (unsigned long)ballCollector.getSortingDelay();
+      
+      if (elapsed < 1000) {
+        robotBackward();  // Uses global baseSpeed
+      } else {
+        stopAllMotors();
+        Serial.println("Task 5: Backup complete -> ROTATE_LEFT");
+        setSubState(T5_ROTATE_LEFT);
       }
-      else if (unloadStep == US_MOVED_TO_TARGET) {
-        if (millis() >= stepEndTime) {
-          // Return servo to home
-          int servoHome = ballCollector.getSortingPos1();
-          ballCollector.testServo("SORTING", servoHome);
-
-          unloadStep = US_WAIT_AFTER_MOVE;
-          stepEndTime = millis() + (unsigned long)ballCollector.getSortingDelay();
-        }
+      break;
+    }
+    
+    // ROTATE_LEFT - left motor backward for 1800ms
+    case T5_ROTATE_LEFT: {
+      unsigned long elapsed = millis() - subStateStartTime;
+      if (elapsed == 0) {
+        Serial.println("Task 5: ROTATE_LEFT - rotating left (left motor back) for 1800ms");
       }
-      else if (unloadStep == US_WAIT_AFTER_MOVE) {
-        if (millis() >= stepEndTime) {
-          // Count the unloaded ball and wait unloadDuration before next cycle
-          ballsUnloaded++;
-          Serial.print("Task 5: ballsUnloaded = ");
-          Serial.println(ballsUnloaded);
-
-          unloadStep = US_RETURNED_HOME;
-          stepEndTime = millis() + unloadDuration;
-        }
+      
+      if (elapsed < 1800) {
+        // Rotate: left motor backward, right motor stopped
+        setLeftMotorSpeed(getRotateSpeed());
+        setRightMotorSpeed(0);
+        leftMotorBackward();
+        setMotorB(0, true);
+      } else {
+        stopAllMotors();
+        Serial.println("Task 5: Rotation complete -> BACKUP_TO_WALL");
+        setSubState(T5_BACKUP_TO_WALL);
       }
-      else if (unloadStep == US_RETURNED_HOME) {
-        if (millis() >= stepEndTime) {
-          // completed unload cycle
-          unloadStep = US_IDLE;
-          // Either repeat to unload next ball or go verify (loop top checks target count)
-        }
+      break;
+    }
+    
+    // BACKUP_TO_WALL - backup until back TOF reads below 50mm
+    case T5_BACKUP_TO_WALL: {
+      readTOFSensors();
+      uint16_t backDist = tofSensors.getBackDistance();
+      bool backOk = tofSensors.isBackValid();
+      
+      // Print occasionally (not every cycle)
+      static unsigned long lastBackupPrint = 0;
+      if (millis() - lastBackupPrint > 300) {
+        Serial.print("T5 BACKUP_TO_WALL (back): ");
+        if (backOk) Serial.print(backDist);
+        else Serial.print("INVALID");
+        Serial.println(" mm (target: <50mm)");
+        lastBackupPrint = millis();
       }
+      
+      if (backOk && backDist <= 50) {
+        stopAllMotors();
+        Serial.print("Task 5: Back wall reached at ");
+        Serial.print(backDist);
+        Serial.println(" mm -> CHECK_COLOR_YELLOW");
+        setSubState(T5_CHECK_COLOR_YELLOW);
+      } else {
+        robotBackward();  // Uses global baseSpeed
+      }
+      break;
+    }
+    
+    // CHECK_COLOR_YELLOW - read back color sensor and drop yellow ball if condition met
+    case T5_CHECK_COLOR_YELLOW: {
+      Serial.println("Task 5: CHECK_COLOR_YELLOW - Reading back color sensor");
+      
+      // Read back color sensor
+      colorSensors.readBackSensor();
+      DetectedColor backColor = colorSensors.getBackColor();
+      
+      Serial.print("Back color detected: ");
+      switch(backColor) {
+        case COLOR_RED: Serial.println("RED"); break;
+        case COLOR_BLUE: Serial.println("BLUE"); break;
+        case COLOR_GREEN: Serial.println("GREEN"); break;
+        case COLOR_YELLOW: Serial.println("YELLOW"); break;
+        case COLOR_WHITE: Serial.println("WHITE"); break;
+        case COLOR_BLACK: Serial.println("BLACK"); break;
+        default: Serial.println("UNKNOWN"); break;
+      }
+      
+      // Show on OLED
+      oledDisplay.show(
+        "Task 5: Color Check",
+        "Val: " + String(barcodeValue) + " (" + String((barcodeValue % 2 == 0) ? "Even" : "Odd") + ")",
+        "Back: " + String(backColor == COLOR_RED ? "RED" : backColor == COLOR_BLUE ? "BLUE" : "OTHER")
+      );
+      
+      bool isEven = (barcodeValue % 2 == 0);
+      bool shouldDropYellow = false;
+      
+      // Logic: Even + RED -> drop yellow, Odd + BLUE -> drop yellow
+      if (isEven && backColor == COLOR_RED) {
+        Serial.println("Condition met: EVEN barcode + RED color -> Dropping YELLOW ball");
+        shouldDropYellow = true;
+      } else if (!isEven && backColor == COLOR_BLUE) {
+        Serial.println("Condition met: ODD barcode + BLUE color -> Dropping YELLOW ball");
+        shouldDropYellow = true;
+      } else {
+        Serial.println("Yellow ball condition NOT met, skipping");
+      }
+      
+      if (shouldDropYellow) {
+        releaseYellowBall();
+        ballsUnloaded++;
+      }
+      
+      delay(500);
+      setSubState(T5_CHECK_COLOR_WHITE);
+      break;
+    }
+    
+    // CHECK_COLOR_WHITE - read back color sensor and drop white ball if condition met
+    case T5_CHECK_COLOR_WHITE: {
+      Serial.println("Task 5: CHECK_COLOR_WHITE - Reading back color sensor");
+      
+      // Read back color sensor again
+      colorSensors.readBackSensor();
+      DetectedColor backColor = colorSensors.getBackColor();
+      
+      Serial.print("Back color detected: ");
+      switch(backColor) {
+        case COLOR_RED: Serial.println("RED"); break;
+        case COLOR_BLUE: Serial.println("BLUE"); break;
+        case COLOR_GREEN: Serial.println("GREEN"); break;
+        case COLOR_YELLOW: Serial.println("YELLOW"); break;
+        case COLOR_WHITE: Serial.println("WHITE"); break;
+        case COLOR_BLACK: Serial.println("BLACK"); break;
+        default: Serial.println("UNKNOWN"); break;
+      }
+      
+      // Show on OLED
+      oledDisplay.show(
+        "Task 5: Color Check",
+        "Val: " + String(barcodeValue) + " (" + String((barcodeValue % 2 == 0) ? "Even" : "Odd") + ")",
+        "Back: " + String(backColor == COLOR_RED ? "RED" : backColor == COLOR_BLUE ? "BLUE" : "OTHER")
+      );
+      
+      bool isEven = (barcodeValue % 2 == 0);
+      bool shouldDropWhite = false;
+      
+      // Logic: Even + BLUE -> drop white, Odd + RED -> drop white
+      if (isEven && backColor == COLOR_BLUE) {
+        Serial.println("Condition met: EVEN barcode + BLUE color -> Dropping WHITE ball");
+        shouldDropWhite = true;
+      } else if (!isEven && backColor == COLOR_RED) {
+        Serial.println("Condition met: ODD barcode + RED color -> Dropping WHITE ball");
+        shouldDropWhite = true;
+      } else {
+        Serial.println("White ball condition NOT met, skipping");
+      }
+      
+      if (shouldDropWhite) {
+        releaseWhiteBall();
+        ballsUnloaded++;
+      }
+      
+      delay(500);
+      setSubState(T5_VERIFY);
       break;
     }
 
@@ -481,8 +607,13 @@ void Task5Unloading::setSubState(Task5SubState newSubState) {
     Serial.print("Task 5 sub-state -> ");
     Serial.println(getSubStateName());
 
-    // Reset sequencing if leaving UNLOADING
-    if (newSubState != T5_UNLOADING) {
+    // Reset sequencing if leaving UNLOADING states
+    if (newSubState != T5_UNLOADING && 
+        newSubState != T5_BACKUP_AFTER_ALIGN &&
+        newSubState != T5_ROTATE_LEFT &&
+        newSubState != T5_BACKUP_TO_WALL &&
+        newSubState != T5_CHECK_COLOR_YELLOW &&
+        newSubState != T5_CHECK_COLOR_WHITE) {
       unloadStep = US_IDLE;
       backGoodCount = 0;
     }
@@ -501,6 +632,11 @@ String Task5Unloading::getSubStateName() {
     case T5_NAVIGATE_TO_ZONE: return "NAVIGATE";
     case T5_ALIGN:            return "ALIGN";
     case T5_UNLOADING:        return "UNLOADING";
+    case T5_BACKUP_AFTER_ALIGN: return "BACKUP";
+    case T5_ROTATE_LEFT:      return "ROTATE";
+    case T5_BACKUP_TO_WALL:   return "BACKUP_WALL";
+    case T5_CHECK_COLOR_YELLOW: return "CHK_YELLOW";
+    case T5_CHECK_COLOR_WHITE:  return "CHK_WHITE";
     case T5_VERIFY:           return "VERIFY";
     case T5_COMPLETED:        return "COMPLETED";
     default:                  return "UNKNOWN";
@@ -570,4 +706,44 @@ void Task5Unloading::testOutServo(int angle) {
   Serial.print("OUT Servo test: ");
   Serial.print(angle);
   Serial.println("°");
+}
+
+void Task5Unloading::releaseYellowBall() {
+  Serial.println("=== Releasing YELLOW Ball ===");
+  Serial.print("Moving OUT servo to yellow position: ");
+  Serial.print(outServoPos1);
+  Serial.println("°");
+  
+  // Move to yellow ball position
+  outServo.write(outServoPos1);
+  delay(1000);  // Wait for servo to reach position and ball to drop
+  
+  // Return to home position
+  Serial.print("Returning to home position: ");
+  Serial.print(outServoPos0);
+  Serial.println("°");
+  outServo.write(outServoPos0);
+  delay(500);
+  
+  Serial.println("Yellow ball released successfully");
+}
+
+void Task5Unloading::releaseWhiteBall() {
+  Serial.println("=== Releasing WHITE Ball ===");
+  Serial.print("Moving OUT servo to white position: ");
+  Serial.print(outServoPos2);
+  Serial.println("°");
+  
+  // Move to white ball position
+  outServo.write(outServoPos2);
+  delay(1000);  // Wait for servo to reach position and ball to drop
+  
+  // Return to home position
+  Serial.print("Returning to home position: ");
+  Serial.print(outServoPos0);
+  Serial.println("°");
+  outServo.write(outServoPos0);
+  delay(500);
+  
+  Serial.println("White ball released successfully");
 }

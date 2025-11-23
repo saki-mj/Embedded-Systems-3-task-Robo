@@ -726,6 +726,16 @@ void processSerialCommand(String command) {
     Serial.println(" ms");
     oledDisplay.show("Done Delay", String(delay) + " ms");
   }
+  else if (command == "RELEASEYELLOW" || command == "RY") {
+    Serial.println("Releasing yellow ball...");
+    task5Unloading.releaseYellowBall();
+    oledDisplay.show("Release", "Yellow Ball");
+  }
+  else if (command == "RELEASEWHITE" || command == "RW") {
+    Serial.println("Releasing white ball...");
+    task5Unloading.releaseWhiteBall();
+    oledDisplay.show("Release", "White Ball");
+  }
   else if (command == "HELP" || command == "?") {
     printSerialCommands();
   }
@@ -857,6 +867,9 @@ void printSerialCommands() {
   Serial.print("  T3TOPTHRESH <mm> - Top detection threshold (");
   Serial.print(task3Ramp.getTopDetectionThreshold());
   Serial.println(")");
+  Serial.print("  T3TURNDUR <ms> - Turn duration for 90° (");
+  Serial.print(task3Ramp.getTurnDuration());
+  Serial.println(")");
   Serial.println();
   Serial.println("Task 4 Barcode Configuration:");
   Serial.print("  T4WALLDIST <mm> - Wall detection distance (");
@@ -905,6 +918,10 @@ void printSerialCommands() {
   Serial.print("°, White: ");
   Serial.print(task5Unloading.getOutServoPos2());
   Serial.println("°)");
+  Serial.println();
+  Serial.println("Ball Release (Task 5):");
+  Serial.println("  RELEASEYELLOW (or RY) - Release yellow ball");
+  Serial.println("  RELEASEWHITE (or RW) - Release white ball");
   Serial.println();
   Serial.println("State Machine:");
   Serial.println("  START - Enter IDLE state (ready to run)");

@@ -8,11 +8,9 @@
 // -------------------------------------------------------------------------
 // Global Speed Variables
 // -------------------------------------------------------------------------
-int baseSpeed = 70;    // Base speed for forward movement (PWM: 0-1023)
-int rotateSpeed = 50;   // Speed for turning/rotation (PWM: 0-1023)
-=======
-int rotateSpeed = 60;   // Speed for turning/rotation (PWM: 0-1023)
->>>>>>> Stashed changes
+int baseSpeed = 350;  // Base speed for forward movement (PWM: 0-1023)
+int rotateSpeed = 350;  // Speed for turning/rotation (PWM: 0-1023)
+
 #include "src/IRReading.h"
 #include "src/LineFollow.h"
 #include "src/WallFollow.h"
@@ -28,11 +26,8 @@ int rotateSpeed = 60;   // Speed for turning/rotation (PWM: 0-1023)
 #include "src/tasks/Task4_Barcode.h"
 #include "src/tasks/Task5_Unloading.h"
 #include "src/tasks/BallCollector.h"
-<<<<<<< Updated upstream
-=======
 #include "src/Gyroscope.h"
 #include "src/LED.h"
->>>>>>> Stashed changes
 
 // -------------------------------------------------------------------------
 // Activity Tracking for QR Code Display
@@ -42,6 +37,14 @@ unsigned long lastActivityTime = 0;
 const unsigned long INACTIVITY_TIMEOUT = 30000; // 30 seconds in milliseconds
 bool qrCodeDisplayed = false;
 const String GITHUB_REPO_URL = "https://github.com/saki-mj/Embedded-Systems-3-task-Robo.git";
+
+// -------------------------------------------------------------------------
+// Auto-start Timer
+// -------------------------------------------------------------------------
+
+unsigned long robotReadyTime = 0;
+const unsigned long AUTO_START_TIMEOUT = 10000; // 10 seconds - auto-start Task 1
+bool autoStartTriggered = false;
 
 void updateActivity() {
   lastActivityTime = millis();
@@ -79,6 +82,9 @@ void setup() {
   // Initialize external LEDs
   initLED();
   
+  // Initialize gyroscope
+  initGyroscope();
+  
   // Initialize line following
   initLineFollow();
   
@@ -87,6 +93,11 @@ void setup() {
   
   // Initialize state machine
   initStateMachine();
+  
+  // Set to AUTOMATIC mode for task progression
+  stateMachine.setMode(MODE_AUTOMATIC);
+  stateMachine.setState(STATE_IDLE);
+  Serial.println("Robot set to AUTOMATIC mode - tasks will progress automatically");
   
   // Initialize all tasks
   task1Plantation.init();
@@ -114,14 +125,40 @@ void setup() {
   
   // Initialize activity tracking
   updateActivity();
+  
+  // Initialize auto-start timer
+  robotReadyTime = millis();
+  autoStartTriggered = false;
 }
 
 void loop() {
-  // Update push button state
+  // *** PRIORITY 1: PUSH BUTTONS - Always check first ***
   pushButton.update();
-  
-  // Handle push button controls
   handlePushButtonControls();
+  
+  // *** PRIORITY 2: Serial commands ***
+  if (Serial.available() > 0) {
+    String command = Serial.readStringUntil('\n');
+    updateActivity(); // Reset inactivity timer on serial command
+    processSerialCommand(command);
+  }
+  
+  // *** PRIORITY 3: Auto-start (only if no buttons pressed) ***
+  unsigned long currentTime = millis();
+  if (!autoStartTriggered && 
+      stateMachine.getState() == STATE_IDLE && 
+      (currentTime - robotReadyTime >= AUTO_START_TIMEOUT)) {
+    autoStartTriggered = true;
+    Serial.println("\n*** AUTO-START (10s): Starting Task 1 in AUTOMATIC mode ***");
+    Serial.println("    Tasks will progress automatically: T1→T2→T3→T4→T5");
+    oledDisplay.show("AUTO START", "Task 1", "Automatic");
+    delay(1500);
+    stateMachine.setState(STATE_TASK1_PLANTATION);
+    task1Plantation.start();
+  }
+  
+  // Update state machine
+  stateMachine.update();
   
   // Update OLED with real-time speed (every 500ms when idle)
   static unsigned long lastSpeedUpdate = 0;
@@ -130,45 +167,62 @@ void loop() {
     oledDisplay.showStatus("Idle", baseSpeed);
   }
   
-  // Check for serial commands
-  if (Serial.available() > 0) {
-    String command = Serial.readStringUntil('\n');
-    updateActivity(); // Reset inactivity timer on serial command
-    processSerialCommand(command);
-  }
-  
   // Check for inactivity and display QR code
-  unsigned long currentTime = millis();
   if (!qrCodeDisplayed && (currentTime - lastActivityTime >= INACTIVITY_TIMEOUT)) {
     oledDisplay.showQRCode(GITHUB_REPO_URL);
     qrCodeDisplayed = true;
     Serial.println("Displaying QR code due to 30 seconds of inactivity");
   }
   
-  // Update state machine
-  stateMachine.update();
-  
   // Execute current task based on state
   switch(stateMachine.getState()) {
     case STATE_TASK1_PLANTATION:
       updateActivity(); // Reset timer when task is active
       task1Plantation.execute();
+      // Auto-progress to Task 2 when complete (automatic mode)
+      if (task1Plantation.isCompleted() && stateMachine.isAutomaticMode()) {
+        Serial.println("*** Task 1 Complete - Auto-progressing to Task 2 ***");
+        stateMachine.markTaskCompleted();
+        stateMachine.setState(STATE_TASK2_WALL_FOLLOW);
+        task2WallFollow.start();
+        oledDisplay.show("Task 1 Done", "Starting Task 2");
+        delay(1000);
+      }
       break;
     case STATE_TASK2_WALL_FOLLOW:
       updateActivity(); // Reset timer when task is active
       task2WallFollow.execute();
+      // Auto-progress to Task 3 when complete (automatic mode)
+      if (task2WallFollow.isCompleted() && stateMachine.isAutomaticMode()) {
+        Serial.println("*** Task 2 Complete - Auto-progressing to Task 3 ***");
+        stateMachine.markTaskCompleted();
+        stateMachine.setState(STATE_TASK3_RAMP);
+        task3Ramp.start();
+        oledDisplay.show("Task 2 Done", "Starting Task 3");
+        delay(1000);
+      }
       break;
     case STATE_TASK3_RAMP:
       updateActivity(); // Reset timer when task is active
       task3Ramp.execute();
+      // Auto-progress to Task 4 when complete (automatic mode)
+      if (task3Ramp.isCompleted() && stateMachine.isAutomaticMode()) {
+        Serial.println("*** Task 3 Complete - Auto-progressing to Task 4 ***");
+        stateMachine.markTaskCompleted();
+        stateMachine.setState(STATE_TASK4_BARCODE);
+        task4Barcode.start();
+        oledDisplay.show("Task 3 Done", "Starting Task 4");
+        delay(1000);
+      }
       break;
     case STATE_TASK4_BARCODE:
       updateActivity(); // Reset timer when task is active
       led.led1On(); // LED1 on during Task 4
       task4Barcode.execute();
-      // Check if Task 4 is complete and auto-start Task 5
-      if (task4Barcode.isCompleted()) {
-        Serial.println("*** Task 4 Complete - Auto-starting Task 5 ***");
+      // Auto-progress to Task 5 when complete (automatic mode)
+      if (task4Barcode.isCompleted() && stateMachine.isAutomaticMode()) {
+        Serial.println("*** Task 4 Complete - Auto-progressing to Task 5 ***");
+        stateMachine.markTaskCompleted();
         stateMachine.setState(STATE_TASK5_UNLOADING);
         task5Unloading.start();
         oledDisplay.show("Task 4 Done", "Starting Task 5");
@@ -179,9 +233,16 @@ void loop() {
       updateActivity(); // Reset timer when task is active
       led.led1On(); // LED1 on during Task 5
       task5Unloading.execute();
-      // Turn off LED when Task 5 is complete
+      // Mark complete and turn off LED
       if (task5Unloading.isCompleted()) {
         led.led1Off();
+        if (stateMachine.isAutomaticMode()) {
+          Serial.println("*** Task 5 Complete - All tasks finished! ***");
+          stateMachine.markTaskCompleted();
+          stateMachine.setState(STATE_IDLE);
+          oledDisplay.show("All Tasks", "COMPLETED!");
+          delay(2000);
+        }
       }
       break;
     default:
@@ -277,135 +338,64 @@ void loop() {
 // -------------------------------------------------------------------------
 
 void handlePushButtonControls() {
-  // DOWN button - No function (disabled)
-  if (pushButton.wasPressed(BTN_DOWN)) {
-    // Button press detected but no action taken
-    updateActivity(); // Reset timer on button press
+  // Any button press cancels auto-start and resets timer
+  Button currentBtn = pushButton.getCurrentButton();
+  if (currentBtn != BTN_NONE) {
+    autoStartTriggered = true; // Cancel auto-start
+    robotReadyTime = millis(); // Reset timer
+    updateActivity(); // Reset inactivity timer
   }
   
-  // LEFT button - Execute Task 4 then Task 5
-  if (pushButton.wasPressed(BTN_LEFT)) {
-    updateActivity(); // Reset timer on button press
-    RobotState currentState = stateMachine.getState();
-    
-    // Only allow if not in emergency or standby
-    if (currentState == STATE_EMERGENCY_STOP || currentState == STATE_STANDBY) {
-      Serial.println("Cannot start tasks - Resume or complete initialization first");
-      oledDisplay.show("Cannot Start", "Resume First");
-      delay(1000);
-      return;
-    }
-    
-    // SAFETY: Stop motors first
+  // UP button - Start Task 2 (Wall Follow) and continue to next tasks
+  if (pushButton.wasPressed(BTN_UP)) {
     stopAllMotors();
+    if (isLineFollowActive()) toggleLineFollow();
+    if (wallFollow.isActive()) wallFollow.stop();
     
-    // Stop line following if active
-    if (isLineFollowActive()) {
-      toggleLineFollow();
-    }
-    
-    // Stop wall following if active
-    if (wallFollow.isActive()) {
-      wallFollow.stop();
-    }
-    
-    // Stop all current tasks
     task1Plantation.stop();
     task2WallFollow.stop();
     task3Ramp.stop();
     task4Barcode.stop();
     task5Unloading.stop();
     
-    // Start Task 4 (Barcode)
-    Serial.println("*** LEFT Button: Starting Task 4 (Barcode) ***");
-    stateMachine.setState(STATE_TASK4_BARCODE);
-    task4Barcode.start();
-    led.led1On(); // Turn on LED1 for Task 4 & 5
-    oledDisplay.show("LEFT Button", "Task 4", "Barcode");
+    Serial.println("*** UP Button: Starting Task 2 (Wall Follow) and continuing ***");
+    stateMachine.setState(STATE_TASK2_WALL_FOLLOW);
+    task2WallFollow.start();
+    oledDisplay.show("UP Button", "Task 2", "Wall Follow");
     delay(1500);
   }
   
-  // RIGHT button - Change Tasks (cycle through tasks)
-  if (pushButton.wasPressed(BTN_RIGHT)) {
-    updateActivity(); // Reset timer on button press
-    RobotState currentState = stateMachine.getState();
-    RobotState nextState;
-    
-    // Only allow task switching if not in emergency or standby
-    if (currentState == STATE_EMERGENCY_STOP || currentState == STATE_STANDBY) {
-      Serial.println("Cannot switch tasks - Resume or complete initialization first");
-      oledDisplay.show("Cannot Switch", "Resume First");
-      delay(1000);
-      return;
-    }
-    
-    // SAFETY: Stop motors first to prevent runaway
+  // LEFT button - Ball Collector Control (execute BALLCOLLECT command)
+  if (pushButton.wasPressed(BTN_LEFT)) {
+    Serial.println("*** LEFT Button: Executing BALLCOLLECT command ***");
+    oledDisplay.show("LEFT Button", "Ball", "Collecting");
+    ballCollector.collectingBall();  // Execute ball collection
+    delay(1500);
+  }
+  
+  // DOWN button - Start Task 4 (Barcode)
+  if (pushButton.wasPressed(BTN_DOWN)) {
     stopAllMotors();
+    if (isLineFollowActive()) toggleLineFollow();
+    if (wallFollow.isActive()) wallFollow.stop();
     
-    // Stop line following if active
-    if (isLineFollowActive()) {
-      toggleLineFollow();
-    }
-    
-    // Stop wall following if active
-    if (wallFollow.isActive()) {
-      wallFollow.stop();
-    }
-    
-    // Now safely stop current task
     task1Plantation.stop();
     task2WallFollow.stop();
     task3Ramp.stop();
     task4Barcode.stop();
     task5Unloading.stop();
     
-    // Cycle through tasks
-    switch(currentState) {
-      case STATE_IDLE:
-      case STATE_TASK1_PLANTATION:
-        nextState = STATE_TASK2_WALL_FOLLOW;
-        task2WallFollow.start();
-        Serial.println("*** Switching to Task 2: Wall Following ***");
-        oledDisplay.show("Switch Task", "Task 2", "Wall Follow");
-        break;
-        
-      case STATE_TASK2_WALL_FOLLOW:
-        nextState = STATE_TASK3_RAMP;
-        task3Ramp.start();
-        Serial.println("*** Switching to Task 3: Ramp ***");
-        oledDisplay.show("Switch Task", "Task 3", "Ramp");
-        break;
-        
-      case STATE_TASK3_RAMP:
-        nextState = STATE_TASK4_BARCODE;
-        task4Barcode.start();
-        Serial.println("*** Switching to Task 4: Barcode ***");
-        oledDisplay.show("Switch Task", "Task 4", "Barcode");
-        break;
-        
-      case STATE_TASK4_BARCODE:
-        nextState = STATE_TASK5_UNLOADING;
-        task5Unloading.start();
-        Serial.println("*** Switching to Task 5: Unloading ***");
-        oledDisplay.show("Switch Task", "Task 5", "Unloading");
-        break;
-        
-      case STATE_TASK5_UNLOADING:
-        nextState = STATE_TASK1_PLANTATION;
-        task1Plantation.start();
-        Serial.println("*** Switching to Task 1: Plantation ***");
-        oledDisplay.show("Switch Task", "Task 1", "Plantation");
-        break;
-        
-      default:
-        nextState = STATE_TASK1_PLANTATION;
-        task1Plantation.start();
-        Serial.println("*** Starting Task 1: Plantation ***");
-        oledDisplay.show("Switch Task", "Task 1", "Plantation");
-        break;
-    }
-    
-    stateMachine.setState(nextState);
-    delay(1500);  // Show message for 1.5 seconds
+    Serial.println("*** DOWN Button: Starting Task 4 (Barcode) ***");
+    stateMachine.setState(STATE_TASK4_BARCODE);
+    task4Barcode.start();
+    led.led1On();
+    oledDisplay.show("DOWN Button", "Task 4", "Barcode");
+    delay(1500);
   }
+  
+  // RIGHT button - DISABLED (not used)
+  // if (pushButton.wasPressed(BTN_RIGHT)) { }
+  
+  // MIDDLE button - DISABLED (not used)
+  // if (pushButton.wasPressed(BTN_MIDDLE)) { }
 }

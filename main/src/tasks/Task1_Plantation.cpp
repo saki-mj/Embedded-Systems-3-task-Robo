@@ -1,25 +1,16 @@
 /*********************************************************************
- * Task 1: Plantation Task Implementation
- * Path:
- *  - Find main line, 90° right, backup 1000 ms.
- *  - For each of 4 lines:
- *      * Go DOWN: line follow, 3 intersections, read color+OLED.
- *      * On 3rd: 180° right, come back UP (no color).
- *      * On 3rd again (top):
- *          - If line 1..3: 90° right, move to next line, 90° right,
- *            backup 1000 ms, repeat.
- *          - If line 4: 90° right, forward 3000 ms, COMPLETED.
+ * Task 1: Plantation Task Implementation - Simplified Version
+ * Logic:
+ *  - Go forward until cross detected
+ *  - Cross 1: Turn right 90°, backup 0.75s, line follow
+ *  - Cross 2: Turn left, backup 1s, line follow
+ *  - Crosses 3-7: Go forward without stopping
+ *  - Cross 8: Turn left, backup 1s, line follow
+ *  - Cross 9: Forward 0.5s, turn right blindly, forward until left wall detected
+ *  - When left wall detected: Move to Task 2
  *********************************************************************/
-// SERIAL OUTPUT GUIDELINES:
-// - Print status ONCE when entering a new state (use static bool or state tracking)
-// - For time-based actions: print "Action for X ms" ONCE at start
-// - For condition-based actions: print "Action until condition" ONCE at start
-// - Avoid printing inside loops that run every cycle
-// - Low-level motor/sensor functions don't print - task prints context
-/**********************************************************************/
 
 #include "Task1_Plantation.h"
-//#include "BallCollector.h"   // Not used in this version
 #include "../Motors.h"
 #include "../IRReading.h"
 #include "../LineFollow.h"
@@ -30,44 +21,24 @@
 // Global task object
 Task1Plantation task1Plantation;
 
-// ---------- Plantation task helpers & state variables ----------
-
-// Turn command type for T1_TURNING
-enum T1TurnCommand {
-  T1_TURN_NONE,
-  T1_TURN_RIGHT_90,
-  T1_TURN_LEFT_90,
-  T1_TURN_180
-};
+// ---------- Task1 Timings & Settings ----------
 
 // Tunable timings (milliseconds) - Global definitions for Task1
-// These match the extern declarations in Task1_Plantation.h
-unsigned long T1_TURN_90_TIME_MS      = 2000;   // 90° turn time
-unsigned long T1_TURN_180_TIME_MS     = 3500;   // 180° turn time
-unsigned long T1_BACKUP_TIME_MS       = 1500;   // backup after aligning with a line
-unsigned long T1_EXIT_FORWARD_TIME_MS = 3000;   // final straight exit time
+unsigned long T1_TURN_90_TIME_MS      = 1500;   // 90° turn time
+unsigned long T1_TURN_180_TIME_MS     = 3500;   // 180° turn time (not used in new logic)
+unsigned long T1_BACKUP_TIME_MS       = 1000;   // backup time after turns
+unsigned long T1_EXIT_FORWARD_TIME_MS = 500;    // forward time after cross 9
 
 // Task1 runtime-configurable defaults
-int T1_SPEED_LEVEL = 6;                          // default speed level (1-12)
+uint8_t T1_SPEED_LEVEL = 6;                      // default speed level (1-12)
 int T1_INTERSECTION_WHITE_MIN = 7;               // minimum white sensors to detect intersection
 
-// Plantation grid settings
-const int T1_INTERSECTIONS_PER_LINE   = 3;   // 3 intersections in each vertical line
-const int T1_NUM_LINES                = 4;   // 4 vertical lines total
-// T1_INTERSECTION_WHITE_MIN is defined above with other tunable parameters
-
-// NEW: default Task1 speed level (1..12) for SerialCommands.cpp
-// NOTE: This value is initialized here, but is updated at runtime via serial commands.
-uint8_t T1_SPEED_LEVEL = 6;  // Default mid-level (updated by serial commands)
-
-// State for current plantation sweep
-static T1TurnCommand  t1PendingTurn        = T1_TURN_NONE;
-static Task1SubState  t1NextStateAfterTurn = T1_LINE_FOLLOWING;
-
-static int  t1CurrentLine          = 0;   // 0..3 (4 lines)
-static int  t1IntersectionCount    = 0;   // number of intersections in current direction
-static bool t1ReturningAlongLine   = false; // false = going down, true = coming back up
-static bool t1IntersectionLatched  = false; // avoid double-counting same intersection
+// Cross counting state
+static int  t1CrossCount          = 0;   // Total crosses detected (0-9)
+static bool t1CrossLatched        = false; // avoid double-counting same cross
+static unsigned long t1ActionStartTime = 0; // Timer for timed actions
+static bool t1ActionComplete      = false; // Flag for action completion
+static int  t1CurrentAction       = 0;   // Current action step (0=idle, 1=turning, 2=backing, 3=following, etc)
 
 // ---------- SETTER FUNCTIONS FOR SERIAL TUNING ----------
 
@@ -101,7 +72,25 @@ void T1_setIntersectionWhiteMin(int min) {
   Serial.println(min);
 }
 
-// ---------- Plantation task main methods ----------
+// ---------- HELPER FUNCTION: Read and display color ----------
+void T1_readAndDisplayColor(int crossNum) {
+  if (colorSensors.isBottomReady() && colorSensors.readBottomSensor()) {
+    DetectedColor col = colorSensors.getBottomColor();
+    String colorName = colorSensors.getColorName(col);
+    Serial.print("  Cross ");
+    Serial.print(crossNum);
+    Serial.print(" Color: ");
+    Serial.println(colorName);
+    
+    oledDisplay.show("Task 1 Cross " + String(crossNum),
+                     "Color: " + colorName,
+                     "Continuing...");
+  } else {
+    Serial.println("  Bottom color sensor not ready!");
+  }
+}
+
+// ---------- Task1 main methods ----------
 
 // Constructor
 Task1Plantation::Task1Plantation() {
@@ -110,10 +99,10 @@ Task1Plantation::Task1Plantation() {
   taskActive = false;
   
   // Default configuration (can be changed via serial commands)
-  turnDuration = 1000;  // 1 second for 90° turn
-  searchDuration = 5000;  // 5 seconds search time
-  collectDuration = 2000;  // 2 seconds collection time
-  ballDetectionThreshold = 100;  // Default threshold
+  turnDuration = 1000;
+  searchDuration = 5000;
+  collectDuration = 2000;
+  ballDetectionThreshold = 100;
 }
 
 // Initialize task
@@ -123,350 +112,209 @@ void Task1Plantation::init() {
   subStateStartTime = millis();
   taskActive        = false;
 
-  // Reset plantation sweep state
-  t1PendingTurn        = T1_TURN_NONE;
-  t1NextStateAfterTurn = T1_LINE_FOLLOWING;
-  t1CurrentLine        = 0;
-  t1IntersectionCount  = 0;
-  t1ReturningAlongLine = false;
-  t1IntersectionLatched= false;
-
-  // Using global baseSpeed and rotateSpeed from main.ino
+  // Reset cross counting state
+  t1CrossCount      = 0;
+  t1CrossLatched    = false;
+  t1ActionStartTime = 0;
+  t1ActionComplete  = false;
+  t1CurrentAction   = 0;
 
   oledDisplay.show("Task 1", "Plantation", "Initialized");
   delay(1000);
 }
 
-// Execute task
+// Execute task - Simplified sequential logic
 void Task1Plantation::execute() {
   if (!taskActive) return;
 
-  // ---------- MAIN SUB-STATE MACHINE ----------
-  switch (currentSubState) {
+  // Read IR sensors for cross detection
+  readAllIRSensorsBinary();
+  int whiteCount = 0;
+  for (int i = 0; i < NUM_IR_SENSORS; i++) {
+    if (irBinary[i] == 1) whiteCount++;
+  }
+  bool crossDetected = (whiteCount >= T1_INTERSECTION_WHITE_MIN);
 
-    // -----------------------------------------------------------
-    // 1) INIT: reset everything and start searching for main line
-    // -----------------------------------------------------------
-    case T1_INIT: {
-      Serial.println("Task 1: INIT state");
+  // ---------- MAIN LOGIC BASED ON CROSS COUNT ----------
 
-      t1PendingTurn        = T1_TURN_NONE;
-      t1NextStateAfterTurn = T1_LINE_FOLLOWING;
-      t1CurrentLine        = 0;
-      t1IntersectionCount  = 0;
-      t1ReturningAlongLine = false;
-      t1IntersectionLatched= false;
-
-      T1_setSpeedLevel(T1_SPEED_LEVEL);   // moderate speed
-      robotForward();     // move from yellow start head into arena
-
-      // Go to SEARCHING: move forward until IR 3..15 see the white line
-      setSubState(T1_SEARCHING);
-      break;
-    }
-
-    // -----------------------------------------------------------
-    // 2) SEARCHING: move forward until IR sensors 3..15 see white line
-    // -----------------------------------------------------------
-    case T1_SEARCHING: {
-      // Move forward and watch the IR array
-      readAllIRSensorsBinary();
-
-      bool lineDetected = false;
-      // detect white line by IR sensor 3 to 15
-      for (int i = 3; i <= 15; i++) {
-        if (irBinary[i] == 1) {
-          lineDetected = true;
-          break;
+  // ACTION 0: Idle - go forward until first cross
+  if (t1CurrentAction == 0) {
+    if (!crossDetected) {
+      executeLineFollow();  // Follow line or move forward
+    } else {
+      if (!t1CrossLatched) {
+        t1CrossLatched = true;
+        t1CrossCount++;
+        Serial.print("=== Cross ");
+        Serial.print(t1CrossCount);
+        Serial.println(" detected ===");
+        
+        // Read and display color
+        T1_readAndDisplayColor(t1CrossCount);
+        
+        // Determine action based on cross number
+        if (t1CrossCount == 1) {
+          // Cross 1: Turn right, backup 0.75s
+          Serial.println("Action: Turn right 90°");
+          stopAllMotors();
+          t1CurrentAction = 1;  // Turn right
+          t1ActionStartTime = millis();
+        } else if (t1CrossCount == 2) {
+          // Cross 2: Turn left, backup 1s
+          Serial.println("Action: Turn left 90°");
+          stopAllMotors();
+          t1CurrentAction = 3;  // Turn left
+          t1ActionStartTime = millis();
+        } else if (t1CrossCount >= 3 && t1CrossCount <= 7) {
+          // Crosses 3-7: Go forward without stopping
+          Serial.println("Action: Continue forward");
+          // Don't change action, just keep going
+        } else if (t1CrossCount == 8) {
+          // Cross 8: Turn left, backup 1s
+          Serial.println("Action: Turn left 90°");
+          stopAllMotors();
+          t1CurrentAction = 5;  // Turn left for cross 8
+          t1ActionStartTime = millis();
+        } else if (t1CrossCount == 9) {
+          // Cross 9: Forward 0.5s, turn right, forward until left wall
+          Serial.println("Action: Forward 0.5s");
+          t1CurrentAction = 7;  // Forward before blind turn
+          t1ActionStartTime = millis();
         }
       }
-
-      if (!lineDetected) {
-        // Still not on the main grid line -> keep moving forward
-        robotForward();
-      } else {
-        // Found the main grid line -> stop and prepare right 90° turn
-        Serial.println("Task 1: main line detected, prepare 90 deg right");
-        stopAllMotors();
-        t1PendingTurn        = T1_TURN_RIGHT_90;
-        t1NextStateAfterTurn = T1_BACKUP_AFTER_TURN;   // backup then line follow on line 1
-        setSubState(T1_TURNING);
-      }
-      break;
     }
-
-    // -----------------------------------------------------------
-    // 3) BACKUP_AFTER_TURN:
-    //    - after each 90° turn into a vertical line: go back for T1_BACKUP_TIME_MS
-    // -----------------------------------------------------------
-    case T1_BACKUP_AFTER_TURN: {
-      unsigned long elapsed = millis() - subStateStartTime;
-
-      if (elapsed < T1_BACKUP_TIME_MS) {
-        robotBackward();
-      } else {
-        stopAllMotors();
-        Serial.println("Turn + Backup done → starting line following");
-        t1IntersectionCount   = 1; // already on first intersection after turn
-        t1ReturningAlongLine  = false;
-        t1IntersectionLatched = false;
-
-        setSubState(T1_LINE_FOLLOWING);
+    
+    // Reset latch when leaving cross
+    if (!crossDetected && t1CrossLatched) {
+      t1CrossLatched = false;
+      // For crosses 3-7, return to action 0 to continue
+      if (t1CrossCount >= 3 && t1CrossCount <= 7 && t1CurrentAction == 0) {
+        // Already in action 0, just continue
       }
-      break;
     }
+  }
 
-    // -----------------------------------------------------------
-    // 4) TURNING: perform pending 90° / 180° turn using time control
-    // -----------------------------------------------------------
-    case T1_TURNING: {
-      unsigned long elapsed = millis() - subStateStartTime;
-
-      switch (t1PendingTurn) {
-        case T1_TURN_RIGHT_90:
-          if (elapsed < T1_TURN_90_TIME_MS) {
-            robotTurnRight();
-          } else {
-            stopAllMotors();
-            Serial.println("Task 1: 90 deg right turn finished");
-            t1PendingTurn = T1_TURN_NONE;
-            setSubState(t1NextStateAfterTurn);
-          }
-          break;
-
-        case T1_TURN_LEFT_90:
-          if (elapsed < T1_TURN_90_TIME_MS) {
-            robotTurnLeft();
-          } else {
-            stopAllMotors();
-            Serial.println("Task 1: 90 deg left turn finished");
-            t1PendingTurn = T1_TURN_NONE;
-            setSubState(t1NextStateAfterTurn);
-          }
-          break;
-
-        case T1_TURN_180:
-          if (elapsed < T1_TURN_180_TIME_MS) {
-            // 180° = spin in place; both motors in opposite directions
-            leftMotorForward();   // or setLeftMotor(FORWARD, speed);
-            rightMotorBackward(); // or setRightMotor(BACKWARD, speed);
-          } else {
-            stopAllMotors();
-            Serial.println("Task 1: 180 deg turn finished");
-            t1PendingTurn = T1_TURN_NONE;
-            setSubState(t1NextStateAfterTurn);
-          }
-          break;
-
-        case T1_TURN_NONE:
-        default:
-          // Nothing to do, just go to next state
-          setSubState(t1NextStateAfterTurn);
-          break;
-      }
-
-      break;
-    }
-
-    // -----------------------------------------------------------
-    // 5) LINE_FOLLOWING on a vertical line:
-    //    - DOWN first (t1ReturningAlongLine = false)
-    //      * read color + OLED at every intersection
-    //      * at 3rd intersection: 180° and come back up
-    //    - UP after 180° (t1ReturningAlongLine = true)
-    //      * only count intersections, no color
-    //      * at 3rd intersection again (top):
-    //          - lines 1..3: move to next line (two 90° rights)
-    //          - line 4: 90° right and exit forward 3000 ms
-    // -----------------------------------------------------------
-    case T1_LINE_FOLLOWING: {
-      // 1) Keep line following on current line
-      executeLineFollow();    // PD line follow from LineFollow.h
-
-      // 2) Detect intersection with IR array
-      readAllIRSensorsBinary();
-      int whiteCount = 0;
-      for (int i = 0; i < NUM_IR_SENSORS; i++) {
-        if (irBinary[i] == 1) whiteCount++;
-      }
-
-      bool intersectionNow = (whiteCount >= T1_INTERSECTION_WHITE_MIN);
-
-      if (intersectionNow && !t1IntersectionLatched) {
-        // New intersection detected
-        t1IntersectionLatched = true;
-        t1IntersectionCount++;
-
-        Serial.print("Task 1: Intersection #");
-        Serial.print(t1IntersectionCount);
-        Serial.print(" on line ");
-        Serial.print(t1CurrentLine + 1);
-        Serial.print(" (returning = ");
-        Serial.print(t1ReturningAlongLine ? "true" : "false");
-        Serial.println(")");
-
-        // ---------- DOWN direction (away from top corridor) ----------
-        if (!t1ReturningAlongLine) {
-          // Read bottom color sensor and show on OLED
-          DetectedColor col = COLOR_UNKNOWN;
-
-          if (colorSensors.isBottomReady() && colorSensors.readBottomSensor()) {
-            col = colorSensors.getBottomColor();
-            String colorName = colorSensors.getColorName(col);
-            Serial.print("  Color at intersection: ");
-            Serial.println(colorName);
-
-            String lineInfo  = "Line " + String(t1CurrentLine + 1) +
-                               " Int " + String(t1IntersectionCount);
-            oledDisplay.show("Task1 Plantation",
-                             lineInfo,
-                             "Color: " + colorName);
-          } else {
-            Serial.println("  Bottom color sensor not ready!");
-          }
-
-          // If this is the 3rd intersection -> bottom of this line
-          if (t1IntersectionCount == T1_INTERSECTIONS_PER_LINE) {
-            Serial.println("  Reached bottom of line -> 180 deg turn and come back");
-            stopAllMotors();
-            t1PendingTurn        = T1_TURN_180;
-            t1NextStateAfterTurn = T1_LINE_FOLLOWING;   // continue but in reverse direction
-            t1ReturningAlongLine = true;                // now we are "coming back up"
-            t1IntersectionCount  = 1;                   // already on first intersection after turn
-            setSubState(T1_TURNING);
-            break;
-          }
-          // For intersections 1..2 while going down: nothing special
-        }
-        // ---------- UP direction (coming back to top) ----------
-        else {
-          // When we hit the 3rd intersection again, we are back at top.
-          if (t1IntersectionCount == T1_INTERSECTIONS_PER_LINE) {
-            Serial.println("  Back at top of this line");
-
-            stopAllMotors();
-            t1ReturningAlongLine = false;
-            t1IntersectionCount  = 0;
-
-            // Prepare to either go to next line or exit
-            if (t1CurrentLine < T1_NUM_LINES - 1) {
-              // Not the last line -> move to next line
-              t1CurrentLine++;
-              Serial.print("  Moving to next line: ");
-              Serial.println(t1CurrentLine + 1);
-
-              // We are still on this intersection; latch it so MOVE_TO_NEXT_LINE
-              // ignores it until the robot leaves it.
-              t1IntersectionLatched = true;
-
-              t1PendingTurn        = T1_TURN_RIGHT_90;         // first 90° right at top intersection
-              t1NextStateAfterTurn = T1_MOVE_TO_NEXT_LINE;     // then move along top corridor
-            } else {
-              // Last line finished -> go to exit
-              Serial.println("  Finished last line -> exit to right and forward 3000ms");
-              t1PendingTurn        = T1_TURN_RIGHT_90;
-              t1NextStateAfterTurn = T1_EXIT_FORWARD;
-            }
-
-            setSubState(T1_TURNING);
-            break;
-          }
-        }
-
-        // If we reached here: intersection handled but no special turn,
-        // just keep following the line.
-      }
-      else if (!intersectionNow && t1IntersectionLatched) {
-        // Left the intersection area -> arm detection for the next one
-        t1IntersectionLatched = false;
-      }
-
-      break;
-    }
-
-    // -----------------------------------------------------------
-    // 6) MOVE_TO_NEXT_LINE:
-    //    - after finishing a line and turning right at top intersection,
-    //      follow the top horizontal line until the next intersection,
-    //      then turn right 90° into the new vertical line and
-    //      go to T1_BACKUP_AFTER_TURN (backup 1000 ms).
-    // -----------------------------------------------------------
-    case T1_MOVE_TO_NEXT_LINE: {
-      // Follow the top corridor line
-      executeLineFollow();
-
-      readAllIRSensorsBinary();
-      int whiteCount = 0;
-      // BUGFIX: proper loop condition i < NUM_IR_SENSORS
-      for (int i = 0; i < NUM_IR_SENSORS; i++) {
-        if (irBinary[i] == 1) whiteCount++;
-      }
-      bool intersectionNow = (whiteCount >= T1_INTERSECTION_WHITE_MIN);
-
-      if (intersectionNow && !t1IntersectionLatched) {
-        // New intersection -> this is the next vertical line
-        t1IntersectionLatched = true;
-
-        Serial.print("Task 1: Top corridor intersection for line ");
-        Serial.println(t1CurrentLine + 1);
-
-        stopAllMotors();
-        t1PendingTurn        = T1_TURN_RIGHT_90;        // turn into the new vertical line
-        t1NextStateAfterTurn = T1_BACKUP_AFTER_TURN;    // then backup and start line following
-        setSubState(T1_TURNING);
-      }
-      else if (!intersectionNow && t1IntersectionLatched) {
-        // Left the previous intersection region
-        t1IntersectionLatched = false;
-      }
-
-      break;
-    }
-
-    // -----------------------------------------------------------
-    // 7) EXIT_FORWARD:
-    //    - after finishing line 4 and turning right at top intersection,
-    //      go forwards for 3000 ms and then complete the task.
-    // -----------------------------------------------------------
-    case T1_EXIT_FORWARD: {
-      unsigned long elapsed = millis() - subStateStartTime;
-
-      if (elapsed < T1_EXIT_FORWARD_TIME_MS) {
-        robotForward();
-      } else {
-        stopAllMotors();
-        Serial.println("Task 1: EXIT_FORWARD complete -> COMPLETED");
-        setSubState(T1_COMPLETED);
-      }
-      break;
-    }
-
-    // -----------------------------------------------------------
-    // 8) COLLECTING: reserved / not used in this version
-    // -----------------------------------------------------------
-    case T1_COLLECTING: {
-      // No collecting logic in this plantation version
-      break;
-    }
-
-    // -----------------------------------------------------------
-    // 9) PLANTING: reserved for future actions
-    // -----------------------------------------------------------
-    case T1_PLANTING: {
-      // Add planting logic here if needed
-      break;
-    }
-
-    // -----------------------------------------------------------
-    // 10) COMPLETED: plantation task finished
-    // -----------------------------------------------------------
-    case T1_COMPLETED: {
-      Serial.println("Task 1: COMPLETED");
-      taskActive = false;
+  // ACTION 1: Turn right 90° (Cross 1)
+  else if (t1CurrentAction == 1) {
+    unsigned long elapsed = millis() - t1ActionStartTime;
+    if (elapsed < T1_TURN_90_TIME_MS) {
+      robotTurnRight();
+    } else {
       stopAllMotors();
-      break;
+      Serial.println("Turn right complete, backing up 0.75s");
+      t1CurrentAction = 2;  // Backup
+      t1ActionStartTime = millis();
     }
-  } // end switch
+  }
+
+  // ACTION 2: Backup 0.75s (after Cross 1)
+  else if (t1CurrentAction == 2) {
+    unsigned long elapsed = millis() - t1ActionStartTime;
+    if (elapsed < 750) {  // 0.75s backup
+      robotBackward();
+    } else {
+      stopAllMotors();
+      Serial.println("Backup complete, resuming line follow");
+      t1CurrentAction = 0;  // Return to forward/line follow
+      t1CrossLatched = false;  // Reset for next cross
+    }
+  }
+
+  // ACTION 3: Turn left 90° (Cross 2)
+  else if (t1CurrentAction == 3) {
+    unsigned long elapsed = millis() - t1ActionStartTime;
+    if (elapsed < T1_TURN_90_TIME_MS) {
+      robotTurnLeft();
+    } else {
+      stopAllMotors();
+      Serial.println("Turn left complete, backing up 1s");
+      t1CurrentAction = 4;  // Backup
+      t1ActionStartTime = millis();
+    }
+  }
+
+  // ACTION 4: Backup 1s (after Cross 2)
+  else if (t1CurrentAction == 4) {
+    unsigned long elapsed = millis() - t1ActionStartTime;
+    if (elapsed < T1_BACKUP_TIME_MS) {
+      robotBackward();
+    } else {
+      stopAllMotors();
+      Serial.println("Backup complete, resuming line follow");
+      t1CurrentAction = 0;  // Return to forward/line follow
+      t1CrossLatched = false;
+    }
+  }
+
+  // ACTION 5: Turn left 90° (Cross 8)
+  else if (t1CurrentAction == 5) {
+    unsigned long elapsed = millis() - t1ActionStartTime;
+    if (elapsed < T1_TURN_90_TIME_MS) {
+      robotTurnLeft();
+    } else {
+      stopAllMotors();
+      Serial.println("Turn left complete, backing up 1s");
+      t1CurrentAction = 6;  // Backup
+      t1ActionStartTime = millis();
+    }
+  }
+
+  // ACTION 6: Backup 1s (after Cross 8)
+  else if (t1CurrentAction == 6) {
+    unsigned long elapsed = millis() - t1ActionStartTime;
+    if (elapsed < T1_BACKUP_TIME_MS) {
+      robotBackward();
+    } else {
+      stopAllMotors();
+      Serial.println("Backup complete, resuming line follow");
+      t1CurrentAction = 0;  // Return to forward/line follow
+      t1CrossLatched = false;
+    }
+  }
+
+  // ACTION 7: Forward 0.5s (after Cross 9)
+  else if (t1CurrentAction == 7) {
+    unsigned long elapsed = millis() - t1ActionStartTime;
+    if (elapsed < T1_EXIT_FORWARD_TIME_MS) {
+      robotForward();
+    } else {
+      stopAllMotors();
+      Serial.println("Forward complete, turning right blindly");
+      t1CurrentAction = 8;  // Blind right turn
+      t1ActionStartTime = millis();
+    }
+  }
+
+  // ACTION 8: Blind right turn (after Cross 9)
+  else if (t1CurrentAction == 8) {
+    unsigned long elapsed = millis() - t1ActionStartTime;
+    if (elapsed < T1_TURN_90_TIME_MS) {
+      robotTurnRight();
+    } else {
+      stopAllMotors();
+      Serial.println("Blind turn complete, moving forward until left wall");
+      t1CurrentAction = 9;  // Forward until wall
+      t1ActionStartTime = millis();
+    }
+  }
+
+  // ACTION 9: Forward until left wall detected
+  else if (t1CurrentAction == 9) {
+    // Check left TOF sensor
+    readTOFSensors();  // Update TOF readings
+    uint16_t leftDistance = tofSensors.getLeftDistance();
+    
+    if (leftDistance > 0 && leftDistance < 150) {  // Left wall detected within 15cm
+      stopAllMotors();
+      Serial.println("=== Left wall detected - Task 1 COMPLETED ===");
+      Serial.println("=== Moving to Task 2 ===");
+      taskActive = false;
+      setSubState(T1_COMPLETED);
+    } else {
+      // Keep moving forward
+      robotForward();
+    }
+  }
 }
 
 
@@ -478,21 +326,15 @@ void Task1Plantation::updateDisplay() {
   
   oledDisplay.show(
     "Task 1: Plantation",
-    "State: " + getSubStateName(),
-    "Time: " + String((millis() - subStateStartTime) / 1000) + "s"
+    "Cross: " + String(t1CrossCount) + "/9",
+    "Action: " + String(t1CurrentAction)
   );
 }
 
-// Set sub-state
+// Set sub-state (kept for compatibility)
 void Task1Plantation::setSubState(Task1SubState newSubState) {
-  if (currentSubState != newSubState) {
-    currentSubState   = newSubState;
-    subStateStartTime = millis();
-    
-    Serial.print("Task 1 sub-state -> ");
-    Serial.println(getSubStateName());
-    updateDisplay();
-  }
+  currentSubState   = newSubState;
+  subStateStartTime = millis();
 }
 
 // Get current sub-state
@@ -500,45 +342,25 @@ Task1SubState Task1Plantation::getSubState() {
   return currentSubState;
 }
 
-// Get sub-state name
+// Get sub-state name (simplified)
 String Task1Plantation::getSubStateName() {
-  switch(currentSubState) {
-    case T1_INIT:               return "INIT";
-    case T1_SEARCHING:          return "SEARCHING";
-    case T1_BACKUP_AFTER_TURN:  return "BACKUP_AFTER_TURN";
-    case T1_FOLLOWING:          return "BACKUP_ON_LINE"; // legacy
-    case T1_TURNING:            return "TURNING";
-    case T1_LINE_FOLLOWING:     return "LINE_FOLLOWING";
-    case T1_MOVE_TO_NEXT_LINE:  return "MOVE_TO_NEXT_LINE";
-    case T1_EXIT_FORWARD:       return "EXIT_FORWARD";
-    case T1_COLLECTING:         return "COLLECTING";
-    case T1_PLANTING:           return "PLANTING";
-    case T1_COMPLETED:          return "COMPLETED";
-    default:                    return "UNKNOWN";
+  if (currentSubState == T1_COMPLETED) {
+    return "COMPLETED";
   }
+  return "RUNNING (Cross " + String(t1CrossCount) + ")";
 }
 
 // Start task
 void Task1Plantation::start() {
-  Serial.println("Starting Task 1: Plantation");
-  
-  // Recalculate speeds based on current robot base speed
-  int baseSpeed = getCurrentSpeed();
-  searchSpeed   = baseSpeed * searchSpeedMultiplier;
-  followSpeed   = baseSpeed * followSpeedMultiplier;
-  turnSpeed     = baseSpeed * turnSpeedMultiplier;
-  
-  Serial.print("Task1 using base speed: ");
-  Serial.print(baseSpeed);
-  Serial.print(" -> Search: ");
-  Serial.print(searchSpeed);
-  Serial.print(", Follow: ");
-  Serial.print(followSpeed);
-  Serial.print(", Turn: ");
-  Serial.println(turnSpeed);
-  
+  Serial.println("=== Starting Task 1: Plantation (Simplified) ===");
   taskActive = true;
-  setSubState(T1_INIT);
+  t1CrossCount = 0;
+  t1CrossLatched = false;
+  t1ActionStartTime = 0;
+  t1ActionComplete = false;
+  t1CurrentAction = 0;
+  currentSubState = T1_INIT;
+  subStateStartTime = millis();
 }
 
 // Stop task
@@ -563,6 +385,11 @@ void Task1Plantation::reset() {
   currentSubState   = T1_INIT;
   subStateStartTime = millis();
   taskActive        = false;
+  t1CrossCount      = 0;
+  t1CrossLatched    = false;
+  t1ActionStartTime = 0;
+  t1ActionComplete  = false;
+  t1CurrentAction   = 0;
 }
 
 // Configuration setters
@@ -608,51 +435,4 @@ unsigned long Task1Plantation::getCollectDuration() {
 
 uint16_t Task1Plantation::getBallDetectionThreshold() {
   return ballDetectionThreshold;
-}
-
-// Speed multiplier setters
-void Task1Plantation::setSearchSpeedMultiplier(float mult) {
-  searchSpeedMultiplier = mult;
-  int baseSpeed = getCurrentSpeed();
-  searchSpeed   = baseSpeed * searchSpeedMultiplier;
-  Serial.print("T1 Search speed multiplier set to: ");
-  Serial.print(mult, 2);
-  Serial.print("x (speed: ");
-  Serial.print(searchSpeed);
-  Serial.println(")");
-}
-
-void Task1Plantation::setFollowSpeedMultiplier(float mult) {
-  followSpeedMultiplier = mult;
-  int baseSpeed = getCurrentSpeed();
-  followSpeed   = baseSpeed * followSpeedMultiplier;
-  Serial.print("T1 Follow speed multiplier set to: ");
-  Serial.print(mult, 2);
-  Serial.print("x (speed: ");
-  Serial.print(followSpeed);
-  Serial.println(")");
-}
-
-void Task1Plantation::setTurnSpeedMultiplier(float mult) {
-  turnSpeedMultiplier = mult;
-  int baseSpeed = getCurrentSpeed();
-  turnSpeed     = baseSpeed * turnSpeedMultiplier;
-  Serial.print("T1 Turn speed multiplier set to: ");
-  Serial.print(mult, 2);
-  Serial.print("x (speed: ");
-  Serial.print(turnSpeed);
-  Serial.println(")");
-}
-
-// Speed multiplier getters
-float Task1Plantation::getSearchSpeedMultiplier() {
-  return searchSpeedMultiplier;
-}
-
-float Task1Plantation::getFollowSpeedMultiplier() {
-  return followSpeedMultiplier;
-}
-
-float Task1Plantation::getTurnSpeedMultiplier() {
-  return turnSpeedMultiplier;
 }
