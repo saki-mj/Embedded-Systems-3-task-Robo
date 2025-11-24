@@ -1,7 +1,9 @@
 #include <Wire.h>
 #include <MPU6050.h>
+#include <QMC5883LCompass.h>
 
 MPU6050 mpu;
+QMC5883LCompass compass;
 
 // calibration offset variables
 float accelOffsetX = 0, accelOffsetY = 0, accelOffsetZ = 0;
@@ -33,6 +35,10 @@ float R_measure_yaw = 0.03;
 float angle_yaw = 0;
 float bias_yaw = 0;
 float P_yaw[2][2] = {{0, 0}, {0, 0}};
+
+// Compass variables
+float compassYaw = 0;
+float compassOffsetYaw = 0;  // Calibration offset for compass
 
 unsigned long lastTime = 0;
 
@@ -73,6 +79,12 @@ void setup() {
   }
   Serial.println("MPU6050 connected.");
 
+  // Initialize QMC5883L Compass
+  Serial.println("Initializing QMC5883L Compass...");
+  compass.init();
+  compass.setSmoothing(10, true);  // Smooth readings
+  Serial.println("QMC5883L Compass connected.");
+
   // give time to stabilize
   delay(1000);
 
@@ -86,6 +98,12 @@ void setup() {
   Serial.print("gyroOffsetX  = "); Serial.print(gyroOffsetX);
   Serial.print(", gyroOffsetY  = "); Serial.print(gyroOffsetY);
   Serial.print(", gyroOffsetZ  = "); Serial.println(gyroOffsetZ);
+  
+  // Calibrate compass yaw offset
+  Serial.println("Calibrating compass for initial heading...");
+  compass.read();
+  compassOffsetYaw = compass.getAzimuth();
+  Serial.print("Compass offset yaw = "); Serial.println(compassOffsetYaw);
   
   lastTime = millis();
 }
@@ -121,9 +139,16 @@ void loop() {
                               &angle_pitch, &bias_pitch, P_pitch,
                               Q_angle_pitch, Q_bias_pitch, R_measure_pitch);
   
-  // Apply Kalman filter for Yaw (using gyro integration as measurement)
-  float yaw_measurement = angle_yaw + GyroZ * dt;
-  float yaw = kalmanFilter(yaw_measurement, GyroZ, dt,
+  // Read compass for absolute yaw heading
+  compass.read();
+  compassYaw = compass.getAzimuth() - compassOffsetYaw;
+  
+  // Normalize compass yaw to -180 to 180 range
+  if (compassYaw > 180) compassYaw -= 360;
+  if (compassYaw < -180) compassYaw += 360;
+  
+  // Apply Kalman filter for Yaw using compass measurement (more accurate than gyro drift)
+  float yaw = kalmanFilter(compassYaw, GyroZ, dt,
                            &angle_yaw, &bias_yaw, P_yaw,
                            Q_angle_yaw, Q_bias_yaw, R_measure_yaw);
 
@@ -134,6 +159,8 @@ void loop() {
   Serial.print(roll, 2);
   Serial.print(",Yaw:");
   Serial.print(yaw, 2);
+  Serial.print(",CompassYaw:");
+  Serial.print(compassYaw, 2);
   Serial.print(",GyroX:");
   Serial.print(GyroX, 2);
   Serial.print(",GyroY:");
