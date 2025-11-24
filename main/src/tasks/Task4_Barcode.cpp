@@ -59,60 +59,9 @@ void Task4Barcode::execute() {
   
   switch(currentSubState) {
     case T4_INIT:
-      Serial.println("Task 4: Initializing barcode reading");
+      Serial.println("Task 4: Initializing barcode reading (starting from wall follow position)");
       readTOFSensors();  // Start TOF sensor reading
-      setSubState(T4_SEARCHING_WALL1);
-      break;
-      
-    case T4_SEARCHING_WALL1:
-      // Follow left wall using PD control and check front TOF sensor
-      readTOFSensors();
-      
-      // Start wall following if not already active
-      if (!wallFollow.isActive()) {
-        Serial.print("Following left wall until front TOF reads ");
-        Serial.print(wallDetectionDistance);
-        Serial.println(" mm");
-        wallFollow.start();
-      }
-      
-      // Use wall following with left TOF sensor (uses global baseSpeed)
-      wallFollow.setTargetDistance(wallFollowDistance);
-      wallFollow.executeWallFollow(tofSensors.getLeftDistance());
-      
-      // Only change state when FRONT TOF detects wall
-      if (tofSensors.getFrontDistance() <= wallDetectionDistance) {
-        Serial.print("Wall 1 detected at ");
-        Serial.print(tofSensors.getFrontDistance());
-        Serial.println(" mm");
-        wallFollow.stop();
-        stopAllMotors();
-        delay(300);
-        setSubState(T4_TURNING_RIGHT1);
-        turnStartTime = millis();
-      }
-      break;
-      
-    case T4_TURNING_RIGHT1:
-      // Turn right 90 degrees
-      {
-        static bool printedOnce = false;
-        if (!printedOnce) {
-          Serial.print("Turning right 90° for ");
-          Serial.print(turnRightDuration);
-          Serial.println(" ms");
-          printedOnce = true;
-        }
-        
-        robotTurnRight();  // Uses global rotateSpeed
-        
-        if (isTurnComplete()) {
-          stopAllMotors();
-          delay(300);
-          printedOnce = false;
-          setSubState(T4_SEARCHING_WALL2);
-        }
-      }
+      setSubState(T4_SEARCHING_WALL2);
       break;
       
     case T4_SEARCHING_WALL2:
@@ -269,6 +218,13 @@ void Task4Barcode::execute() {
       Serial.print("  binary = ");
       Serial.println(barcodeData);
       Serial.println("Use TASK5 command to start unloading when ready");
+
+      // Also show the result on the OLED display
+      oledDisplay.show(
+        "Task 4: Barcode",
+        "Val: " + String(barcodeValue),
+        "Bin: " + barcodeData
+      );
       
       setSubState(T4_COMPLETED);
       break;
@@ -295,9 +251,7 @@ bool Task4Barcode::isTurnComplete() {
   // Check which turn we're doing based on current state
   unsigned long requiredDuration;
   
-  if (currentSubState == T4_TURNING_RIGHT1) {
-    requiredDuration = turnRightDuration;
-  } else if (currentSubState == T4_TURNING_LEFT2) {
+  if (currentSubState == T4_TURNING_LEFT2) {
     requiredDuration = turnLeftDuration;
   } else {
     requiredDuration = turnRightDuration;  // Default to right turn duration
@@ -343,8 +297,6 @@ Task4SubState Task4Barcode::getSubState() {
 String Task4Barcode::getSubStateName() {
   switch(currentSubState) {
     case T4_INIT: return "INIT";
-    case T4_SEARCHING_WALL1: return "SEARCH_WALL1";
-    case T4_TURNING_RIGHT1: return "TURN_RIGHT1";
     case T4_SEARCHING_WALL2: return "SEARCH_WALL2";
     case T4_WALL_LOSS_FORWARD: return "WALL_LOSS_FWD";
     case T4_TURNING_LEFT2: return "TURN_LEFT2";

@@ -31,6 +31,11 @@ enum Task5SubState {
   T5_NAVIGATE_TO_ZONE,
   T5_ALIGN,
   T5_UNLOADING,
+  T5_BACKUP_AFTER_ALIGN,
+  T5_ROTATE_LEFT,
+  T5_BACKUP_TO_WALL,
+  T5_CHECK_COLOR_YELLOW,
+  T5_CHECK_COLOR_WHITE,
   T5_VERIFY,
   T5_COMPLETED
 };
@@ -130,6 +135,10 @@ class Task5Unloading {
     int getOutServoPos1() { return outServoPos1; }
     int getOutServoPos2() { return outServoPos2; }
     void testOutServo(int angle);
+    
+    // Manual ball release functions
+    void releaseYellowBall();
+    void releaseWhiteBall();
 };
 
 // Global instance
