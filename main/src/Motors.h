@@ -1,9 +1,9 @@
 // -------------------------------------------------------------------------
-// MotorConfig.h - TB6612 Motor Driver Library for ESP32-S3
+// Motors.h - TB6612 Motor Driver Library for ESP32-S3
 // -------------------------------------------------------------------------
 
-#ifndef MOTOR_CONFIG_H
-#define MOTOR_CONFIG_H
+#ifndef MOTORS_H
+#define MOTORS_H
 
 #include <Arduino.h>
 
@@ -29,9 +29,9 @@ const int maxSpeed = 1023; // 10-bit resolution (0 to 1023)
 const int freq = 30000;    // PWM frequency in Hz (30 kHz)
 
 // --- Speed Settings ---
-const int minSpeedValue = 100;  // Minimum speed value (motors can actually run)
-const int maxSpeedValue = 255;  // Maximum speed value
-const int speedLevels = 10;     // Number of speed levels (1-10)
+const int minSpeedPWM = 25;    // Minimum PWM value (speed level 1)
+const int maxSpeedPWM = 1023;  // Maximum PWM value (10-bit)
+const int speedLevels = 12;    // Number of speed levels (1-12)
 
 // -------------------------------------------------------------------------
 // Global Variables
@@ -119,10 +119,28 @@ void stopAllMotors();
 // -------------------------------------------------------------------------
 
 /**
- * @brief Set speed level (1-10)
- * @param level Speed level from 1 to 10
+ * @brief Set speed level (1-12)
+ * @param level Speed level from 1 to 12
  */
 void setSpeedLevel(int level);
+
+/**
+ * @brief Set current speed directly (for advanced control)
+ * @param speed PWM value (0-1023)
+ */
+void setCurrentSpeed(int speed);
+
+/**
+ * @brief Set left motor speed independently (for wall following, etc.)
+ * @param speed PWM value (0-1023)
+ */
+void setLeftMotorSpeed(int speed);
+
+/**
+ * @brief Set right motor speed independently (for wall following, etc.)
+ * @param speed PWM value (0-1023)
+ */
+void setRightMotorSpeed(int speed);
 
 /**
  * @brief Get current speed value in PWM units (0-1023)
@@ -131,25 +149,10 @@ void setSpeedLevel(int level);
 int getCurrentSpeed();
 
 /**
- * @brief Map speed level (1-10) to PWM value (0-1023)
- * @param level Speed level from 1 to 10
- * @return PWM value (0-1023)
+ * @brief Map speed level (1-12) to PWM value
+ * @param level Speed level from 1 to 12
+ * @return PWM value
  */
 int mapSpeedLevelToPWM(int level);
 
-// -------------------------------------------------------------------------
-// Serial Command Functions
-// -------------------------------------------------------------------------
-
-/**
- * @brief Process serial command string
- * @param command Command string from Serial input
- */
-void processCommand(String command);
-
-/**
- * @brief Print available serial commands
- */
-void printCommands();
-
-#endif // MOTOR_CONFIG_H
+#endif // MOTORS_H
