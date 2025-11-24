@@ -11,6 +11,7 @@
 
 #include "Task4_Barcode.h"
 #include "Task5_Unloading.h"
+#include "ReadBarcode.h"
 #include "../Motors.h"
 #include "../IRReading.h"
 #include "../OLEDDisplay.h"
@@ -28,20 +29,13 @@ Task4Barcode::Task4Barcode() {
   // Default configuration (all can be changed via serial commands)
   wallDetectionDistance = 200;  // 20cm in mm
   wallFollowDistance = 150;     // 15cm target for wall following
+  wallLossThreshold = 300;      // 30cm - wall is lost if distance > this
+  wallLossForwardDuration = 500; // 0.5 second forward after wall loss
   turnRightDuration = 1000;     // 1 second for right turn 90 degrees
   turnLeftDuration = 1000;      // 1 second for left turn 90 degrees
   straightDuration = 1000;      // 1 second for straight movement
   reverseDuration = 500;        // 0.5 second for reverse
   irWhiteThreshold = 2000;      // IR threshold: above=white(1), below=black(0)
-  
-  // Initialize barcode reading
-  for(int i = 0; i < 4; i++) {
-    barcodeBits[i] = -1;
-  }
-  for(int i = 0; i < 16; i++) {
-    barcodeCounts[i] = 0;
-  }
-  barcodeReadComplete = false;
 }
 
 void Task4Barcode::init() {
@@ -50,13 +44,10 @@ void Task4Barcode::init() {
   subStateStartTime = millis();
   taskActive = false;
   barcodeData = "";
-  for(int i = 0; i < 4; i++) {
-    barcodeBits[i] = -1;
-  }
-  for(int i = 0; i < 16; i++) {
-    barcodeCounts[i] = 0;
-  }
-  barcodeReadComplete = false;
+  
+  // Initialize barcode reader with default settings
+  barcodeReader.init();
+  
   oledDisplay.show("Task 4", "Barcode", "Initialized");
   delay(1000);
 }
@@ -125,14 +116,14 @@ void Task4Barcode::execute() {
       break;
       
     case T4_SEARCHING_WALL2:
-      // Follow left wall using PD control and check front TOF sensor
+      // Follow left wall until wall is lost
       readTOFSensors();
       
       // Start wall following if not already active
       if (!wallFollow.isActive()) {
-        Serial.print("Following left wall until front TOF reads ");
-        Serial.print(wallDetectionDistance);
-        Serial.println(" mm");
+        Serial.print("Following left wall until wall is lost (distance > ");
+        Serial.print(wallLossThreshold);
+        Serial.println(" mm)");
         wallFollow.start();
       }
       
@@ -140,16 +131,37 @@ void Task4Barcode::execute() {
       wallFollow.setTargetDistance(wallFollowDistance);
       wallFollow.executeWallFollow(tofSensors.getLeftDistance());
       
-      // Only change state when FRONT TOF detects wall
-      if (tofSensors.getFrontDistance() <= wallDetectionDistance) {
-        Serial.print("Wall 2 detected at ");
-        Serial.print(tofSensors.getFrontDistance());
+      // Detect when left wall is lost
+      if (tofSensors.getLeftDistance() > wallLossThreshold) {
+        Serial.print("Left wall lost at ");
+        Serial.print(tofSensors.getLeftDistance());
         Serial.println(" mm");
         wallFollow.stop();
-        stopAllMotors();
-        delay(300);
-        setSubState(T4_TURNING_LEFT2);
-        turnStartTime = millis();
+        setSubState(T4_WALL_LOSS_FORWARD);
+        wallLossForwardStartTime = millis();
+      }
+      break;
+      
+    case T4_WALL_LOSS_FORWARD:
+      // Go forward for configured time after wall loss
+      {
+        static bool printedOnce = false;
+        if (!printedOnce) {
+          Serial.print("Moving forward for ");
+          Serial.print(wallLossForwardDuration);
+          Serial.println(" ms after wall loss");
+          printedOnce = true;
+        }
+        
+        robotForward();  // Uses global baseSpeed
+        
+        if (currentTime - wallLossForwardStartTime >= wallLossForwardDuration) {
+          stopAllMotors();
+          delay(300);
+          printedOnce = false;
+          setSubState(T4_TURNING_LEFT2);
+          turnStartTime = millis();
+        }
       }
       break;
       
@@ -202,18 +214,16 @@ void Task4Barcode::execute() {
       // Brief alignment phase
       Serial.println("Task 4: Preparing to read barcode");
       delay(500);
-      for(int i = 0; i < 4; i++) {
-        barcodeBits[i] = -1;
-      }
-      for(int i = 0; i < 16; i++) {
-        barcodeCounts[i] = 0;
-      }
-      barcodeReadComplete = false;
+      
+      // Initialize barcode reader
+      barcodeReader.reset();
+      barcodeReader.startReading();
+      
       setSubState(T4_READING);
       break;
       
     case T4_READING:
-      // Move forward at constant speed and read barcode
+      // Move forward at constant speed and read barcode using ReadBarcode class
       {
         static bool printedOnce = false;
         if (!printedOnce) {
@@ -222,10 +232,12 @@ void Task4Barcode::execute() {
         }
         
         robotForward();  // Uses global baseSpeed
-        readBarcodeBar();
+        
+        // Process barcode reading
+        barcodeReader.processReading();
         
         // Check if barcode reading is complete
-        if (barcodeReadComplete) {
+        if (barcodeReader.isComplete()) {
           stopAllMotors();
           Serial.println("Barcode reading complete!");
           printedOnce = false;
@@ -234,11 +246,33 @@ void Task4Barcode::execute() {
       }
       break;
       
-    case T4_PROCESSING:
+    case T4_PROCESSING: {
       Serial.println("Task 4: Processing barcode data");
-      processBarcodeData();
+      
+      // Get barcode result from ReadBarcode class
+      barcodeData = barcodeReader.getBinaryResult();
+      int barcodeValue = barcodeReader.getDecimalValue();
+      
+      Serial.println("\n=== Barcode Processing Complete ===");
+      Serial.print("Binary: ");
+      Serial.println(barcodeData);
+      Serial.print("Decimal: ");
+      Serial.println(barcodeValue);
+      
+      // Store barcode but DO NOT start Task 5 automatically
+      task5Unloading.setBarcodeValue((uint16_t)barcodeValue);
+      task5Unloading.setBarcodeBinary(barcodeData);
+      
+      Serial.println("Task4: Barcode stored for Task5");
+      Serial.print("  value = ");
+      Serial.print(barcodeValue);
+      Serial.print("  binary = ");
+      Serial.println(barcodeData);
+      Serial.println("Use TASK5 command to start unloading when ready");
+      
       setSubState(T4_COMPLETED);
       break;
+    }
       
     case T4_COMPLETED:
       Serial.println("Task 4: COMPLETED");
@@ -250,130 +284,7 @@ void Task4Barcode::execute() {
   }
 }
 
-void Task4Barcode::readBarcodeBar() {
-  // Read all IR sensors
-  readAllIRSensors();
-  
-  // Read barcode using sensors 6, 7, 8, 9 (indices 6, 7, 8, 9)
-  // Each sensor reads one bar independently
-  // IR value > threshold = white = 1
-  // IR value <= threshold = black = 0
-  
-  // Sample interval to avoid reading too fast
-  static unsigned long lastReadTime = 0;
-  unsigned long currentTime = millis();
-  
-  if (currentTime - lastReadTime < 100) {  // Read every 100ms
-    return;
-  }
-  lastReadTime = currentTime;
-  
-  // Read current barcode value from 4 sensors
-  int currentBarcode = 0;
-  
-  // Sensor 6 = bit 3 (MSB)
-  if (irValues[6] > irWhiteThreshold) {
-    currentBarcode |= (1 << 3);  // Set bit 3
-  }
-  
-  // Sensor 7 = bit 2
-  if (irValues[7] > irWhiteThreshold) {
-    currentBarcode |= (1 << 2);  // Set bit 2
-  }
-  
-  // Sensor 8 = bit 1
-  if (irValues[8] > irWhiteThreshold) {
-    currentBarcode |= (1 << 1);  // Set bit 1
-  }
-  
-  // Sensor 9 = bit 0 (LSB)
-  if (irValues[9] > irWhiteThreshold) {
-    currentBarcode |= (1 << 0);  // Set bit 0
-  }
-  
-  // Increment count for this barcode value
-  barcodeCounts[currentBarcode]++;
-  
-  // Debug output
-  Serial.print("Barcode reading: ");
-  Serial.print(currentBarcode, BIN);
-  Serial.print(" (");
-  Serial.print(currentBarcode);
-  Serial.print(") - IR[6-9]: ");
-  Serial.print(irValues[6]);
-  Serial.print(", ");
-  Serial.print(irValues[7]);
-  Serial.print(", ");
-  Serial.print(irValues[8]);
-  Serial.print(", ");
-  Serial.println(irValues[9]);
-  
-  // Check if we have enough samples (e.g., 20 readings)
-  int totalSamples = 0;
-  for (int i = 0; i < 16; i++) {
-    totalSamples += barcodeCounts[i];
-  }
-  
-  if (totalSamples >= 20) {
-    barcodeReadComplete = true;
-  }
-}
-
-void Task4Barcode::processBarcodeData() {
-  // Find the barcode value that appears most frequently
-  int maxCount = 0;
-  int mostFrequentBarcode = 0;
-  
-  for (int i = 0; i < 16; i++) {
-    Serial.print("Barcode ");
-    Serial.print(i);
-    Serial.print(" (");
-    Serial.print(i, BIN);
-    Serial.print("): ");
-    Serial.print(barcodeCounts[i]);
-    Serial.println(" samples");
-    
-    if (barcodeCounts[i] > maxCount) {
-      maxCount = barcodeCounts[i];
-      mostFrequentBarcode = i;
-    }
-  }
-  
-  // Convert the most frequent barcode to binary string
-  barcodeData = "";
-  for (int i = 3; i >= 0; i--) {
-    if (mostFrequentBarcode & (1 << i)) {
-      barcodeData += "1";
-    } else {
-      barcodeData += "0";
-    }
-  }
-  
-  Serial.println("\n=== Barcode Processing Complete ===");
-  Serial.print("Most Frequent Barcode: ");
-  Serial.print(mostFrequentBarcode);
-  Serial.print(" (appeared ");
-  Serial.print(maxCount);
-  Serial.println(" times)");
-  Serial.print("Binary: ");
-  Serial.println(barcodeData);
-  Serial.print("Decimal: ");
-  Serial.println(mostFrequentBarcode);
-
-// ======================
-// Forward barcode to Task 5
-// ======================
-
-  // --- Forward barcode to Task5 and start unloading ---
-  task5Unloading.setBarcodeValue((uint16_t)mostFrequentBarcode);
-  task5Unloading.setBarcodeBinary(barcodeData);
-  // Optionally immediately start Task5 so unloading runs now
-  task5Unloading.start();
-
-  Serial.println("Task4: forwarded barcode to Task5 and started unloading:");
-  Serial.print("  value = "); Serial.print(mostFrequentBarcode);
-  Serial.print("  binary = "); Serial.println(barcodeData);
-}
+// Removed - barcode reading now handled by ReadBarcode class
 
 bool Task4Barcode::isTurnComplete() {
   // Use gyro or encoder feedback for accurate 90-degree turn detection
@@ -401,13 +312,11 @@ void Task4Barcode::updateDisplay() {
   String line3 = "";
   if (barcodeData.length() > 0) {
     line3 = "Code: " + barcodeData;
+  } else if (barcodeReader.isActive()) {
+    // Show strips detected while reading
+    line3 = "Strips: " + String(barcodeReader.getStripCount()) + "/4";
   } else {
-    // Show total samples collected
-    int totalSamples = 0;
-    for (int i = 0; i < 16; i++) {
-      totalSamples += barcodeCounts[i];
-    }
-    line3 = "Samples: " + String(totalSamples);
+    line3 = "Ready";
   }
   
   oledDisplay.show(
@@ -437,6 +346,7 @@ String Task4Barcode::getSubStateName() {
     case T4_SEARCHING_WALL1: return "SEARCH_WALL1";
     case T4_TURNING_RIGHT1: return "TURN_RIGHT1";
     case T4_SEARCHING_WALL2: return "SEARCH_WALL2";
+    case T4_WALL_LOSS_FORWARD: return "WALL_LOSS_FWD";
     case T4_TURNING_LEFT2: return "TURN_LEFT2";
     case T4_MOVING_REVERSE: return "MOVE_REVERSE";
     case T4_ALIGNING: return "ALIGNING";
@@ -472,13 +382,7 @@ void Task4Barcode::reset() {
   subStateStartTime = millis();
   taskActive = false;
   barcodeData = "";
-  for(int i = 0; i < 4; i++) {
-    barcodeBits[i] = -1;
-  }
-  for(int i = 0; i < 16; i++) {
-    barcodeCounts[i] = 0;
-  }
-  barcodeReadComplete = false;
+  barcodeReader.reset();
 }
 
 String Task4Barcode::getBarcodeData() {
@@ -498,6 +402,20 @@ void Task4Barcode::setWallFollowDistance(uint16_t distance) {
   Serial.print("T4 Wall follow distance set to: ");
   Serial.print(distance);
   Serial.println(" mm");
+}
+
+void Task4Barcode::setWallLossThreshold(uint16_t threshold) {
+  wallLossThreshold = threshold;
+  Serial.print("T4 Wall loss threshold set to: ");
+  Serial.print(threshold);
+  Serial.println(" mm");
+}
+
+void Task4Barcode::setWallLossForwardDuration(unsigned long timeMs) {
+  wallLossForwardDuration = timeMs;
+  Serial.print("T4 Wall loss forward duration set to: ");
+  Serial.print(timeMs);
+  Serial.println(" ms");
 }
 
 void Task4Barcode::setBarcodeSpeed(uint16_t speed) {
@@ -547,6 +465,14 @@ uint16_t Task4Barcode::getWallDetectionDistance() {
 
 uint16_t Task4Barcode::getWallFollowDistance() {
   return wallFollowDistance;
+}
+
+uint16_t Task4Barcode::getWallLossThreshold() {
+  return wallLossThreshold;
+}
+
+unsigned long Task4Barcode::getWallLossForwardDuration() {
+  return wallLossForwardDuration;
 }
 
 unsigned long Task4Barcode::getTurnRightDuration() {

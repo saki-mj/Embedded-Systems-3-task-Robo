@@ -15,7 +15,10 @@ enum Task3SubState {
   T3_AT_TOP,
   T3_DESCENDING,
   T3_AFTER_RAMP,
-  T3_TURN_RIGHT_90,
+  T3_IR_WHITE_DETECT,
+  T3_TURN_RIGHT_90_FIRST,
+  T3_FORWARD_TO_WALL,
+  T3_TURN_RIGHT_90_SECOND,
   T3_WALL_FOLLOW_LEFT,
   T3_COMPLETED
 };
@@ -33,6 +36,7 @@ class Task3Ramp {
     uint16_t rampDetectionDistance;
     uint16_t topDetectionThreshold;
     unsigned long turnDuration;  // Duration for 90° turn
+    unsigned long stateChangeInterval;  // Minimum time between state changes (ms)
 
   public:
     Task3Ramp();
@@ -54,6 +58,7 @@ class Task3Ramp {
     void setRampDetectionDistance(uint16_t distance);
     void setTopDetectionThreshold(uint16_t threshold);
     void setTurnDuration(unsigned long timeMs);
+    void setStateChangeInterval(unsigned long timeMs);
     
     // Configuration getters
     unsigned long getClimbDuration();
@@ -61,6 +66,7 @@ class Task3Ramp {
     uint16_t getRampDetectionDistance();
     uint16_t getTopDetectionThreshold();
     unsigned long getTurnDuration();
+    unsigned long getStateChangeInterval();
 };
 
 extern Task3Ramp task3Ramp;

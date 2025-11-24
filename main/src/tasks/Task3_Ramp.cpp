@@ -15,6 +15,7 @@
 #include "../OLEDDisplay.h"
 #include "../Gyroscope.h"
 #include "../WallFollow.h"
+#include "../IRReading.h"
 
 Task3Ramp task3Ramp;
 
@@ -30,6 +31,7 @@ Task3Ramp::Task3Ramp() {
   rampDetectionDistance = 100;  // mm
   topDetectionThreshold = 300;  // TOF reading at top
   turnDuration = 1000;  // 1 second for 90° turn
+  stateChangeInterval = 2000;  // 2 seconds minimum between state changes
 }
 
 void Task3Ramp::init() {
@@ -67,17 +69,17 @@ void Task3Ramp::execute() {
       
     case T3_APPROACH:
       if (!stateMessagePrinted) {
-        Serial.println("Task 3: APPROACH - Going forward until pitch > +3 degrees");
+        Serial.println("Task 3: APPROACH - Going forward at 2x base speed");
         stateMessagePrinted = true;
       }
       
-      // Go forward at base speed
-      setLeftMotorSpeed(getBaseSpeed());
-      setRightMotorSpeed(getBaseSpeed());
+      // Go forward at 2x base speed
+      setLeftMotorSpeed(getBaseSpeed() * 2);
+      setRightMotorSpeed(getBaseSpeed() * 2);
       robotForward();
       
-      // Check if ramp is detected (pitch > +3 degrees)
-      if (pitch > 3.0) {
+      // Check if ramp is detected (pitch > +7 degrees) and minimum interval passed
+      if (pitch > 7.0 && (millis() - subStateStartTime >= stateChangeInterval)) {
         Serial.print("Ramp detected! Pitch: ");
         Serial.println(pitch);
         setSubState(T3_CLIMBING);
@@ -86,17 +88,17 @@ void Task3Ramp::execute() {
       
     case T3_CLIMBING:
       if (!stateMessagePrinted) {
-        Serial.println("Task 3: CLIMBING - Speed = 2x base speed until stable");
+        Serial.println("Task 3: CLIMBING - Speed = 1023 (maximum) until stable");
         stateMessagePrinted = true;
       }
       
-      // Climb at 2x base speed
-      setLeftMotorSpeed(getBaseSpeed() * 2);
-      setRightMotorSpeed(getBaseSpeed() * 2);
+      // Climb at maximum speed (1023)
+      setLeftMotorSpeed(1023);
+      setRightMotorSpeed(1023);
       robotForward();
       
-      // Check if reached top (pitch returns to stable, near 0 degrees)
-      if (pitch >= -3.0 && pitch <= 3.0) {
+      // Check if reached top (pitch drops below 8 degrees) and minimum interval passed
+      if (pitch < 8.0 && (millis() - subStateStartTime >= stateChangeInterval)) {
         Serial.print("Top reached! Pitch stabilized: ");
         Serial.println(pitch);
         setSubState(T3_AT_TOP);
@@ -114,8 +116,8 @@ void Task3Ramp::execute() {
       setRightMotorSpeed(getBaseSpeed());
       robotForward();
       
-      // Check if descending (pitch < -3 degrees)
-      if (pitch < -3.0) {
+      // Check if descending (pitch < -10 degrees) and minimum interval passed
+      if (pitch < -10.0 && (millis() - subStateStartTime >= stateChangeInterval)) {
         Serial.print("Descending detected! Pitch: ");
         Serial.println(pitch);
         setSubState(T3_DESCENDING);
@@ -133,8 +135,8 @@ void Task3Ramp::execute() {
       setRightMotorSpeed(getBaseSpeed() * 0.25);
       robotForward();
       
-      // Check if stable again (pitch returns to near 0 degrees)
-      if (pitch >= -3.0 && pitch <= 3.0) {
+      // Check if stable again (pitch returns above -8 degrees) and minimum interval passed
+      if (pitch > -8.0 && (millis() - subStateStartTime >= stateChangeInterval)) {
         Serial.print("Stable ground reached! Pitch: ");
         Serial.println(pitch);
         setSubState(T3_AFTER_RAMP);
@@ -143,7 +145,7 @@ void Task3Ramp::execute() {
       
     case T3_AFTER_RAMP: {
       if (!stateMessagePrinted) {
-        Serial.println("Task 3: AFTER_RAMP - Going forward until front wall < 70mm");
+        Serial.println("Task 3: AFTER_RAMP - Moving forward to IR detection area");
         stateMessagePrinted = true;
       }
       
@@ -152,20 +154,120 @@ void Task3Ramp::execute() {
       setRightMotorSpeed(getBaseSpeed());
       robotForward();
       
-      uint16_t frontDist = tofSensors.getFrontDistance();
-      if (frontDist < 70) {
-        Serial.print("Front wall detected at ");
-        Serial.print(frontDist);
-        Serial.println(" mm");
+      // Wait for state change interval before moving to next state
+      if (millis() - subStateStartTime >= stateChangeInterval) {
         stopAllMotors();
-        setSubState(T3_TURN_RIGHT_90);
+        setSubState(T3_IR_WHITE_DETECT);
+      }
+      break;
+    }
+    
+    case T3_IR_WHITE_DETECT: {
+      if (!stateMessagePrinted) {
+        Serial.println("Task 3: IR_WHITE_DETECT - Reading IR sensors for white line");
+        stateMessagePrinted = true;
+      }
+      
+      // Go forward slowly while checking IR sensors
+      setLeftMotorSpeed(getBaseSpeed());
+      setRightMotorSpeed(getBaseSpeed());
+      robotForward();
+      
+      // Read IR sensors and check for white detection
+      readAllIRSensors();
+      bool whiteDetected = false;
+      
+      // Check multiple IR sensors for white (assuming white = high value)
+      for (int i = 0; i < 16; i++) {
+        if (irValues[i] > 2000) {  // Adjust threshold as needed
+          whiteDetected = true;
+          break;
+        }
+      }
+      
+      if (whiteDetected && (millis() - subStateStartTime >= stateChangeInterval)) {
+        Serial.println("White line detected on IR sensors");
+        stopAllMotors();
+        setSubState(T3_TURN_RIGHT_90_FIRST);
       }
       break;
     }
       
-    case T3_TURN_RIGHT_90:
+    case T3_TURN_RIGHT_90_FIRST:
       if (!stateMessagePrinted) {
-        Serial.print("Task 3: TURN_RIGHT_90 - Turning right for ");
+        Serial.print("Task 3: TURN_RIGHT_90_FIRST - Turning right (right motor only) for ");
+        Serial.print(turnDuration);
+        Serial.println(" ms");
+        stateMessagePrinted = true;
+        
+        // Turn right: only right motor backward, left motor stopped
+        setLeftMotorSpeed(0);
+        setRightMotorSpeed(getRotateSpeed());
+        setMotorA(0, true);  // Stop left motor
+        rightMotorBackward();
+      }
+      
+      if (millis() - subStateStartTime >= turnDuration) {
+        stopAllMotors();
+        delay(100);  // Brief pause after turn
+        setSubState(T3_FORWARD_TO_WALL);
+      }
+      break;
+      
+    case T3_FORWARD_TO_WALL: {
+      static unsigned long lastCorrectionTime = 0;
+      
+      if (!stateMessagePrinted) {
+        Serial.println("Task 3: FORWARD_TO_WALL - Moving forward with white line correction");
+        stateMessagePrinted = true;
+        lastCorrectionTime = 0;
+      }
+      
+      // Read IR sensors to check for white line on sensors 0 or 1
+      readAllIRSensors();
+      bool whiteOnEdge = (irValues[0] > 2000) || (irValues[1] > 2000);
+      
+      // If white detected on edge sensors and enough time since last correction
+      if (whiteOnEdge && (millis() - lastCorrectionTime > 300)) {
+        Serial.println("White line detected on edge - correcting left");
+        
+        // Quick left correction: 0.2 * turnDuration
+        unsigned long correctionTime = (unsigned long)(turnDuration * 0.2);
+        
+        setLeftMotorSpeed(getRotateSpeed());
+        setRightMotorSpeed(getRotateSpeed());
+        leftMotorBackward();
+        rightMotorForward();
+        
+        delay(correctionTime);
+        
+        stopAllMotors();
+        delay(50);
+        
+        lastCorrectionTime = millis();
+      } else {
+        // Go forward at base speed
+        setLeftMotorSpeed(getBaseSpeed());
+        setRightMotorSpeed(getBaseSpeed());
+        robotForward();
+      }
+      
+      // Check front TOF sensor for wall detection
+      uint16_t frontDist = tofSensors.getFrontDistance();
+      if (frontDist < 150 && (millis() - subStateStartTime >= stateChangeInterval)) {
+        Serial.print("Front wall detected at ");
+        Serial.print(frontDist);
+        Serial.println(" mm");
+        stopAllMotors();
+        lastCorrectionTime = 0;  // Reset for next time
+        setSubState(T3_TURN_RIGHT_90_SECOND);
+      }
+      break;
+    }
+    
+    case T3_TURN_RIGHT_90_SECOND:
+      if (!stateMessagePrinted) {
+        Serial.print("Task 3: TURN_RIGHT_90_SECOND - Turning right for ");
         Serial.print(turnDuration);
         Serial.println(" ms");
         stateMessagePrinted = true;
@@ -186,33 +288,34 @@ void Task3Ramp::execute() {
       
     case T3_WALL_FOLLOW_LEFT: {
       if (!stateMessagePrinted) {
-        Serial.println("Task 3: WALL_FOLLOW_LEFT - Following left wall for 1 second");
+        Serial.println("Task 3: WALL_FOLLOW_LEFT - Following left wall with PD until white line detected");
         stateMessagePrinted = true;
       }
       
-      // Simple left wall following
-      uint16_t leftDist = tofSensors.getLeftDistance();
-      uint16_t targetDist = 85;  // Target distance from left wall
-      
-      if (leftDist < 70) {
-        // Too close to wall - turn slightly right
-        setLeftMotorSpeed(getBaseSpeed());
-        setRightMotorSpeed(getBaseSpeed() - 100);
-        robotForward();
-      } else if (leftDist > targetDist + 10) {
-        // Too far from wall - turn slightly left
-        setLeftMotorSpeed(getBaseSpeed() - 100);
-        setRightMotorSpeed(getBaseSpeed());
-        robotForward();
-      } else {
-        // Good distance - go straight
-        setLeftMotorSpeed(getBaseSpeed());
-        setRightMotorSpeed(getBaseSpeed());
-        robotForward();
+      // Use wall following with PD control
+      if (!wallFollow.isActive()) {
+        wallFollow.start();
       }
       
-      // After 1 second, complete the task
-      if (millis() - subStateStartTime >= 1000) {
+      uint16_t leftDist = tofSensors.getLeftDistance();
+      wallFollow.setTargetDistance(85);  // 8.5cm from left wall
+      wallFollow.executeWallFollow(leftDist);
+      
+      // Check IR sensors for white line detection
+      readAllIRSensors();
+      bool whiteDetected = false;
+      
+      for (int i = 0; i < 16; i++) {
+        if (irValues[i] > 2000) {  // Adjust threshold as needed
+          whiteDetected = true;
+          break;
+        }
+      }
+      
+      // Complete task when white line detected after minimum interval
+      if (whiteDetected && (millis() - subStateStartTime >= stateChangeInterval)) {
+        Serial.println("White line detected - Task 3 complete");
+        wallFollow.stop();
         stopAllMotors();
         setSubState(T3_COMPLETED);
       }
@@ -262,8 +365,11 @@ String Task3Ramp::getSubStateName() {
     case T3_AT_TOP: return "AT_TOP";
     case T3_DESCENDING: return "DESCENDING";
     case T3_AFTER_RAMP: return "AFTER_RAMP";
-    case T3_TURN_RIGHT_90: return "TURN_RIGHT_90";
-    case T3_WALL_FOLLOW_LEFT: return "WALL_FOLLOW_LEFT";
+    case T3_IR_WHITE_DETECT: return "IR_WHITE_DETECT";
+    case T3_TURN_RIGHT_90_FIRST: return "TURN_RIGHT_1";
+    case T3_FORWARD_TO_WALL: return "FWD_TO_WALL";
+    case T3_TURN_RIGHT_90_SECOND: return "TURN_RIGHT_2";
+    case T3_WALL_FOLLOW_LEFT: return "WALL_FOLLOW";
     case T3_COMPLETED: return "COMPLETED";
     default: return "UNKNOWN";
   }
@@ -333,6 +439,13 @@ void Task3Ramp::setTurnDuration(unsigned long timeMs) {
   Serial.println(" ms");
 }
 
+void Task3Ramp::setStateChangeInterval(unsigned long timeMs) {
+  stateChangeInterval = timeMs;
+  Serial.print("T3 State change interval set to: ");
+  Serial.print(timeMs);
+  Serial.println(" ms");
+}
+
 // Configuration getters
 unsigned long Task3Ramp::getClimbDuration() {
   return climbDuration;
@@ -352,4 +465,8 @@ uint16_t Task3Ramp::getTopDetectionThreshold() {
 
 unsigned long Task3Ramp::getTurnDuration() {
   return turnDuration;
+}
+
+unsigned long Task3Ramp::getStateChangeInterval() {
+  return stateChangeInterval;
 }

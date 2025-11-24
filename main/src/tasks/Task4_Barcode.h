@@ -12,8 +12,9 @@ enum Task4SubState {
   T4_INIT,
   T4_SEARCHING_WALL1,      // Following left wall to detect first wall
   T4_TURNING_RIGHT1,       // Turn right 90° after first wall
-  T4_SEARCHING_WALL2,      // Following left wall to detect second wall
-  T4_TURNING_LEFT2,        // Turn left 90° after second wall
+  T4_SEARCHING_WALL2,      // Following left wall until wall is lost
+  T4_WALL_LOSS_FORWARD,    // Go forward after wall loss
+  T4_TURNING_LEFT2,        // Turn left 90° after forward
   T4_MOVING_REVERSE,       // Move reverse for configured time
   T4_ALIGNING,             // Align with barcode
   T4_READING,              // Reading barcode while crossing
@@ -31,6 +32,8 @@ class Task4Barcode {
     // Configuration parameters (can be changed via serial commands)
     uint16_t wallDetectionDistance;  // Distance to detect wall (mm)
     uint16_t wallFollowDistance;     // Target distance for wall following (mm)
+    uint16_t wallLossThreshold;      // Distance threshold to detect wall loss (mm)
+    unsigned long wallLossForwardDuration;  // Time to go forward after wall loss (ms)
     unsigned long turnRightDuration;  // Time for right turn 90° (ms)
     unsigned long turnLeftDuration;   // Time for left turn 90° (ms)
     unsigned long straightDuration;   // Time for straight movement (ms)
@@ -38,21 +41,15 @@ class Task4Barcode {
     uint16_t irWhiteThreshold;        // IR threshold: above=white(1), below=black(0)
     uint16_t barcodeSpeed;            // Add barcodeSpeed as a member variable
     
-    // Barcode reading variables
-    int barcodeBits[4];           // Barcode bits read by sensors 6,7,8,9
-    int barcodeCounts[16];        // Count occurrences of each barcode value (0-15)
-    bool barcodeReadComplete;
-    
     // Timing tracking
     unsigned long turnStartTime;
     unsigned long straightStartTime;
     unsigned long reverseStartTime;
+    unsigned long wallLossForwardStartTime;
     
     // Helper functions
     void detectWallAndTurn();
     void performTurn90();
-    void readBarcodeBar();
-    void processBarcodeData();
     bool isTurnComplete();
     
   public:
@@ -73,6 +70,8 @@ class Task4Barcode {
     // Configuration setters
     void setWallDetectionDistance(uint16_t distance);
     void setWallFollowDistance(uint16_t distance);
+    void setWallLossThreshold(uint16_t threshold);
+    void setWallLossForwardDuration(unsigned long timeMs);
     void setTurnRightDuration(unsigned long timeMs);
     void setTurnLeftDuration(unsigned long timeMs);
     void setStraightDuration(unsigned long timeMs);
@@ -83,6 +82,8 @@ class Task4Barcode {
     // Getters for current values
     uint16_t getWallDetectionDistance();
     uint16_t getWallFollowDistance();
+    uint16_t getWallLossThreshold();
+    unsigned long getWallLossForwardDuration();
     unsigned long getTurnRightDuration();
     unsigned long getTurnLeftDuration();
     unsigned long getStraightDuration();

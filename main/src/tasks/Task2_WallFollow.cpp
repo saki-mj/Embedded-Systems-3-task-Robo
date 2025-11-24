@@ -26,7 +26,7 @@ Task2WallFollow::Task2WallFollow() {
   wallNearThreshold = 200;       // mm - distance to detect wall nearby
   wallFarThreshold = 150;        // mm - distance to detect wall ended
   cornerDelay = 1500;            // ms - delay after corner detected
-  turnDuration = 3500;           // ms - duration for 90° turn
+  turnDuration = 1500;           // ms - duration for 90° turn
   targetWallDistance = 85;       // mm - target distance to maintain
   
   lastError = 0;
@@ -226,19 +226,28 @@ void Task2WallFollow::execute() {
       
     case T2_FINAL_FORWARD: {
       if (!stateMessagePrinted) {
-        Serial.println("Task 2: Moving forward - task continuing");
+        Serial.println("Task 2: Moving forward until 2 seconds or front TOF < 80mm");
         stateMessagePrinted = true;
       }
       
       robotForward();
       
-      // You can add a condition here to complete the task
-      // For now, it continues forward indefinitely
-      // Uncomment below to auto-complete after 3 seconds:
-      // if (millis() - subStateStartTime >= 3000) {
-      //   stopAllMotors();
-      //   setSubState(T2_COMPLETED);
-      // }
+      uint16_t frontDist = tofSensors.getFrontDistance();
+      
+      // Complete if 2 seconds elapsed OR front TOF reads below 80mm
+      if (millis() - subStateStartTime >= 2000 || frontDist < 80) {
+        stopAllMotors();
+        
+        if (frontDist < 80) {
+          Serial.print("Task 2: Front wall detected at ");
+          Serial.print(frontDist);
+          Serial.println(" mm");
+        } else {
+          Serial.println("Task 2: 2 seconds elapsed");
+        }
+        
+        setSubState(T2_COMPLETED);
+      }
       break;
     }
       

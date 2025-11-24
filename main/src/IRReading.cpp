@@ -32,23 +32,23 @@ void initIRSensors() {
   // Set the MUX SIG pin as an INPUT
   pinMode(SIG_PIN, INPUT);
   
-  // Load preset threshold values
-  irThresholds[0] = 2212;
-  irThresholds[1] = 2316;
-  irThresholds[2] = 2537;
-  irThresholds[3] = 2540;
-  irThresholds[4] = 2774;
-  irThresholds[5] = 2764;
-  irThresholds[6] = 2684;
-  irThresholds[7] = 2693;
-  irThresholds[8] = 3067;
-  irThresholds[9] = 3259;
-  irThresholds[10] = 3117;
-  irThresholds[11] = 2881;
-  irThresholds[12] = 2735;
-  irThresholds[13] = 2777;
-  irThresholds[14] = 2631;
-  irThresholds[15] = 2471;
+  // Load preset threshold values (calibrated)
+  irThresholds[0] = 2163;
+  irThresholds[1] = 2279;
+  irThresholds[2] = 2460;
+  irThresholds[3] = 2460;
+  irThresholds[4] = 2580;
+  irThresholds[5] = 2668;
+  irThresholds[6] = 2607;
+  irThresholds[7] = 2567;
+  irThresholds[8] = 2574;
+  irThresholds[9] = 2696;
+  irThresholds[10] = 2585;
+  irThresholds[11] = 2464;
+  irThresholds[12] = 2382;
+  irThresholds[13] = 2423;
+  irThresholds[14] = 2414;
+  irThresholds[15] = 2249;
   
   irCalibrated = true;  // Mark as calibrated with preset values
   
