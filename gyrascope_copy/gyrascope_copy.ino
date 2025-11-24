@@ -10,8 +10,30 @@ float gyroOffsetX  = 0, gyroOffsetY  = 0, gyroOffsetZ  = 0;
 const int16_t ACCEL_SENSITIVITY = 16384; // for ±2 g
 const int16_t GYRO_SENSITIVITY  = 131;   // for ±250 deg/s
 
-// Yaw tracking
-float yaw = 0.0;
+// Kalman filter variables for Roll
+float Q_angle_roll = 0.001;
+float Q_bias_roll = 0.003;
+float R_measure_roll = 0.03;
+float angle_roll = 0;
+float bias_roll = 0;
+float P_roll[2][2] = {{0, 0}, {0, 0}};
+
+// Kalman filter variables for Pitch
+float Q_angle_pitch = 0.001;
+float Q_bias_pitch = 0.003;
+float R_measure_pitch = 0.03;
+float angle_pitch = 0;
+float bias_pitch = 0;
+float P_pitch[2][2] = {{0, 0}, {0, 0}};
+
+// Kalman filter variables for Yaw
+float Q_angle_yaw = 0.001;
+float Q_bias_yaw = 0.003;
+float R_measure_yaw = 0.03;
+float angle_yaw = 0;
+float bias_yaw = 0;
+float P_yaw[2][2] = {{0, 0}, {0, 0}};
+
 unsigned long lastTime = 0;
 
 void setup() {
@@ -85,12 +107,25 @@ void loop() {
   float GyroY = (gy   - gyroOffsetY)  / float(GYRO_SENSITIVITY);
   float GyroZ = (gz   - gyroOffsetZ)  / float(GYRO_SENSITIVITY);
 
-  // compute roll & pitch
-  float roll  = atan2(AccY, AccZ) * 180.0 / PI;
-  float pitch = atan2(-AccX, sqrt(AccY * AccY + AccZ * AccZ)) * 180.0 / PI;
+  // compute raw roll & pitch from accelerometer
+  float roll_acc  = atan2(AccY, AccZ) * 180.0 / PI;
+  float pitch_acc = atan2(-AccX, sqrt(AccY * AccY + AccZ * AccZ)) * 180.0 / PI;
   
-  // compute yaw by integrating gyroZ
-  yaw += GyroZ * dt;
+  // Apply Kalman filter for Roll
+  float roll = kalmanFilter(roll_acc, GyroX, dt, 
+                             &angle_roll, &bias_roll, P_roll,
+                             Q_angle_roll, Q_bias_roll, R_measure_roll);
+  
+  // Apply Kalman filter for Pitch
+  float pitch = kalmanFilter(pitch_acc, GyroY, dt,
+                              &angle_pitch, &bias_pitch, P_pitch,
+                              Q_angle_pitch, Q_bias_pitch, R_measure_pitch);
+  
+  // Apply Kalman filter for Yaw (using gyro integration as measurement)
+  float yaw_measurement = angle_yaw + GyroZ * dt;
+  float yaw = kalmanFilter(yaw_measurement, GyroZ, dt,
+                           &angle_yaw, &bias_yaw, P_yaw,
+                           Q_angle_yaw, Q_bias_yaw, R_measure_yaw);
 
   // Format for Serial Plotter
   Serial.print("Pitch:");
@@ -134,4 +169,38 @@ void calibrateSensor() {
   gyroOffsetX  = (float)sumGx / CALIBRATION_SAMPLES;
   gyroOffsetY  = (float)sumGy / CALIBRATION_SAMPLES;
   gyroOffsetZ  = (float)sumGz / CALIBRATION_SAMPLES;
+}
+
+// Kalman filter function
+float kalmanFilter(float newAngle, float newRate, float dt,
+                   float* angle, float* bias, float P[2][2],
+                   float Q_angle, float Q_bias, float R_measure) {
+  // Predict
+  float rate = newRate - *bias;
+  *angle += dt * rate;
+  
+  P[0][0] += dt * (dt * P[1][1] - P[0][1] - P[1][0] + Q_angle);
+  P[0][1] -= dt * P[1][1];
+  P[1][0] -= dt * P[1][1];
+  P[1][1] += Q_bias * dt;
+  
+  // Update
+  float S = P[0][0] + R_measure;
+  float K[2];
+  K[0] = P[0][0] / S;
+  K[1] = P[1][0] / S;
+  
+  float y = newAngle - *angle;
+  *angle += K[0] * y;
+  *bias += K[1] * y;
+  
+  float P00_temp = P[0][0];
+  float P01_temp = P[0][1];
+  
+  P[0][0] -= K[0] * P00_temp;
+  P[0][1] -= K[0] * P01_temp;
+  P[1][0] -= K[1] * P00_temp;
+  P[1][1] -= K[1] * P01_temp;
+  
+  return *angle;
 }
